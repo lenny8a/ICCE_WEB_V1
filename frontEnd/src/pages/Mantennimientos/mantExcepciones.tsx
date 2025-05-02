@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react"
 import Breadcrumb from "../../components/Breadcrumbs/Breadcrumb"
-import axios from "axios"
-
 import { useToast } from "../../hooks/useToast"
-import ToastContainer from '../../components/ToastContainer';
+import ToastContainer from "../../components/ToastContainer"
+import axios from "axios"
+// Añadir la importación del hook useAuth
+import { useAuth } from "../../context/AuthContext"
 
 // Interfaz para los tipos de excepción
 interface ExcepcionType {
@@ -16,6 +17,63 @@ interface ExcepcionType {
   updatedAt?: string
   _id?: string
 }
+
+// Componente Toast
+const Toast = ({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose()
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed top-16 right-4 z-[9999] ml-0 lg:ml-72.5 shadow-md animate-slideInRight"
+      style={{ minWidth: "250px", maxWidth: "90vw" }}
+    >
+      <div
+        className={`px-3 py-2 rounded-md flex items-center justify-between ${
+          type === "success"
+            ? "bg-green-500/90 text-white border border-green-600"
+            : "bg-red-500/90 text-white border border-red-600"
+        }`}
+      >
+        <div className="flex items-center">
+          {type === "success" ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
+            </svg>
+          )}
+          <p className="text-xs">{message}</p>
+        </div>
+        <button onClick={onClose} className="ml-2 text-white hover:text-gray-200 focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fillRule="evenodd"
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // Componente de diálogo de confirmación
 const ConfirmDialog = ({
   isOpen,
@@ -29,12 +87,10 @@ const ConfirmDialog = ({
   onConfirm: () => void
   title: string
   message: string
-}  ) => {
-  
+}) => {
   if (!isOpen) return null
- 
-  return (
 
+  return (
     <div className="fixed inset-0 z-[9999] overflow-y-auto ml-0 lg:ml-72.5 pt-16">
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Overlay con animación de fade */}
@@ -363,8 +419,8 @@ const ExcepcionModal = ({
   )
 }
 
+// Modificar el componente MantenimientoExcepciones para incluir la verificación de permisos
 const MantenimientoExcepciones = () => {
-  const { toasts, removeToast, success, error } = useToast()
   const [excepciones, setExcepciones] = useState<ExcepcionType[]>([])
   const [filteredExcepciones, setFilteredExcepciones] = useState<ExcepcionType[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -375,11 +431,26 @@ const MantenimientoExcepciones = () => {
   const [isEditing, setIsEditing] = useState(false)
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
   const [excepcionToDelete, setExcepcionToDelete] = useState<ExcepcionType | null>(null)
+  const { toasts, removeToast, success, error } = useToast()
   const api_url = import.meta.env.VITE_API_URL || "http://localhost:4000"
+
+  // Añadir el hook useAuth para verificar permisos
+  const { checkPermission } = useAuth()
+
+  // Definir los permisos necesarios
+  const canView   = checkPermission("/mant/excepciones", "visualizar") 
+  const canCreate = checkPermission("/mant/excepciones", "crear") 
+  const canEdit   = checkPermission("/mant/excepciones", "modificar") 
+  const canDelete = checkPermission("/mant/excepciones", "borrar") 
 
   // Cargar datos al montar el componente
   useEffect(() => {
-    fetchExcepciones()
+    if (canView) {
+      fetchExcepciones()
+    } else {
+      setIsLoading(false)
+      error("No tienes permisos para ver los tipos de excepción")
+    }
   }, [])
 
   // Aplicar filtros cuando cambian
@@ -436,6 +507,10 @@ const MantenimientoExcepciones = () => {
 
   // Función para abrir el modal de creación
   const openCreateModal = () => {
+    if (!canCreate) {
+      error("No tienes permisos para crear tipos de excepción")
+      return
+    }
     setSelectedExcepcion(null)
     setIsEditing(false)
     setIsModalOpen(true)
@@ -443,6 +518,10 @@ const MantenimientoExcepciones = () => {
 
   // Función para abrir el modal de edición
   const openEditModal = (excepcion: ExcepcionType) => {
+    if (!canEdit) {
+      error("No tienes permisos para editar tipos de excepción")
+      return
+    }
     setSelectedExcepcion(excepcion)
     setIsEditing(true)
     setIsModalOpen(true)
@@ -450,6 +529,10 @@ const MantenimientoExcepciones = () => {
 
   // Función para confirmar eliminación
   const confirmDelete = (excepcion: ExcepcionType) => {
+    if (!canDelete) {
+      error("No tienes permisos para eliminar tipos de excepción")
+      return
+    }
     setExcepcionToDelete(excepcion)
     setIsConfirmDialogOpen(true)
   }
@@ -458,6 +541,12 @@ const MantenimientoExcepciones = () => {
   const handleSaveExcepcion = async (excepcion: ExcepcionType) => {
     try {
       if (isEditing) {
+        // Verificar permisos de edición
+        if (!canEdit) {
+          error("No tienes permisos para editar tipos de excepción")
+          return
+        }
+
         // Actualizar excepción existente
         const response = await axios.put(`${api_url}/api/excepciones/${excepcion._id}`, excepcion)
 
@@ -470,6 +559,12 @@ const MantenimientoExcepciones = () => {
           return
         }
       } else {
+        // Verificar permisos de creación
+        if (!canCreate) {
+          error("No tienes permisos para crear tipos de excepción")
+          return
+        }
+
         // Verificar si ya existe una excepción con el mismo ID
         const exists = excepciones.some((item) => item.id === excepcion.id)
         if (exists) {
@@ -510,6 +605,12 @@ const MantenimientoExcepciones = () => {
   const handleDeleteExcepcion = async () => {
     if (!excepcionToDelete) return
 
+    // Verificar permisos de eliminación
+    if (!canDelete) {
+      error("No tienes permisos para eliminar tipos de excepción")
+      return
+    }
+
     try {
       // Eliminar excepción
       const response = await axios.delete(`${api_url}/api/excepciones/${excepcionToDelete._id}`)
@@ -546,6 +647,41 @@ const MantenimientoExcepciones = () => {
     } catch (error) {
       return dateString
     }
+  }
+
+  // Si el usuario no tiene permisos para ver, mostrar mensaje de acceso denegado
+  if (!canView) {
+    return (
+      <>
+        <Breadcrumb pageName="Mantenimiento de Excepciones" />
+        <div className="flex items-center p-6 bg-white dark:bg-boxdark rounded-md shadow-md">
+          <div className="w-full">
+            <div className="flex justify-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-16 h-16 text-danger mb-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <h5 className="text-xl font-semibold text-center mb-2 text-danger">Acceso Denegado</h5>
+            <p className="text-center text-gray-600 dark:text-gray-400">
+              No tienes permisos para acceder a esta sección. Por favor, contacta al administrador si crees que esto es
+              un error.
+            </p>
+          </div>
+        </div>
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+      </>
+    )
   }
 
   return (
@@ -645,26 +781,28 @@ const MantenimientoExcepciones = () => {
               </div>
 
               {/* Botón para agregar nueva excepción */}
-              <button
-                onClick={openCreateModal}
-                className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              {canCreate && (
+                <button
+                  onClick={openCreateModal}
+                  className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
                 >
-                  <path d="M5 12h14"></path>
-                  <path d="M12 5v14"></path>
-                </svg>
-                <span>Nueva Excepción</span>
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M5 12h14"></path>
+                    <path d="M12 5v14"></path>
+                  </svg>
+                  <span>Nueva Excepción</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -759,48 +897,52 @@ const MantenimientoExcepciones = () => {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => openEditModal(excepcion)}
-                              className="inline-flex items-center justify-center p-1.5 bg-amber-400 text-white rounded-md hover:bg-amber-500 transition-colors"
-                              title="Editar"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
+                            {canEdit && (
+                              <button
+                                onClick={() => openEditModal(excepcion)}
+                                className="inline-flex items-center justify-center p-1.5 bg-amber-400 text-white rounded-md hover:bg-amber-500 transition-colors"
+                                title="Editar"
                               >
-                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => confirmDelete(excepcion)}
-                              className="inline-flex items-center justify-center p-1.5 bg-danger text-white rounded-md hover:bg-danger/90 transition-colors"
-                              title="Eliminar"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                                </svg>
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => confirmDelete(excepcion)}
+                                className="inline-flex items-center justify-center p-1.5 bg-danger text-white rounded-md hover:bg-danger/90 transition-colors"
+                                title="Eliminar"
                               >
-                                <path d="M3 6h18"></path>
-                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                              </svg>
-                            </button>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M3 6h18"></path>
+                                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -814,7 +956,7 @@ const MantenimientoExcepciones = () => {
                 {filteredExcepciones.map((excepcion, index) => (
                   <div
                     key={excepcion._id}
-                    className="border border-gray-200 dark:border-gray-600 rounded-xl p-3 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all duration-500 animate-in fade-in-50 zoom-in-90 duration-700"
+                    className="border border-gray-200 dark:border-gray-600 rounded-xl p-3 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-all duration-500 animate-in fade-in-50 zoom-in-90"
                     style={{ animationDelay: `${index * 150}ms` }}
                   >
                     <div className="flex justify-between items-start">
@@ -837,48 +979,52 @@ const MantenimientoExcepciones = () => {
                     </div>
 
                     <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => openEditModal(excepcion)}
-                        className="bg-amber-400 text-white px-2 py-1.5 rounded-lg text-xs flex-1 hover:bg-amber-500 transition-all duration-300 shadow-sm flex items-center justify-center gap-1"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                      {canEdit && (
+                        <button
+                          onClick={() => openEditModal(excepcion)}
+                          className="bg-amber-400 text-white px-2 py-1.5 rounded-lg text-xs flex-1 hover:bg-amber-500 transition-all duration-300 shadow-sm flex items-center justify-center gap-1"
                         >
-                          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-                        </svg>
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => confirmDelete(excepcion)}
-                        className="bg-danger text-white px-2 py-1.5 rounded-lg text-xs flex-1 hover:bg-danger/90 transition-all duration-300 shadow-sm flex items-center justify-center gap-1"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+                          </svg>
+                          Editar
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => confirmDelete(excepcion)}
+                          className="bg-danger text-white px-2 py-1.5 rounded-lg text-xs flex-1 hover:bg-danger/90 transition-all duration-300 shadow-sm flex items-center justify-center gap-1"
                         >
-                          <path d="M3 6h18"></path>
-                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                          <line x1="10" y1="11" x2="10" y2="17"></line>
-                          <line x1="14" y1="11" x2="14" y2="17"></line>
-                        </svg>
-                        Eliminar
-                      </button>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                          </svg>
+                          Eliminar
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -892,4 +1038,3 @@ const MantenimientoExcepciones = () => {
 }
 
 export default MantenimientoExcepciones
-

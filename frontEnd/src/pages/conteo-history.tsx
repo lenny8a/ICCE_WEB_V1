@@ -9,6 +9,8 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useToast } from "../hooks/useToast"
 import ToastContainer from "../components/ToastContainer"
+// Añadir la importación del hook useAuth al inicio del archivo, junto con las otras importaciones
+import { useAuth } from "../context/AuthContext"
 
 // Interfaces
 interface CaseItem {
@@ -56,7 +58,18 @@ interface FilterOptions {
   sortOrder: "asc" | "desc"
 }
 
+// Modificar el componente ConteoHistory para incluir la verificación de permisos
 const ConteoHistory = () => {
+  // Añadir el hook useAuth para obtener el contexto de autenticación
+  const { checkPermission } = useAuth()
+
+  // Definir los permisos necesarios para las diferentes acciones
+  const canView = checkPermission("/conteo-proceso", "visualizar")
+  const canModify = checkPermission("/conteo-proceso", "modificar")
+  const canContabilizar = checkPermission("/conteo-proceso", "contabilizar")
+  const canAnular = checkPermission("/conteo-proceso", "anular")
+
+  // Resto del código existente...
   const [conteos, setConteos] = useState<ConteoData[]>([])
   const [filteredConteos, setFilteredConteos] = useState<ConteoData[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -86,16 +99,33 @@ const ConteoHistory = () => {
 
   // Cargar los datos al montar el componente
   useEffect(() => {
+    // Verificar si el usuario tiene permiso para ver los conteos
+    if (!canView) {
+      setError("No tienes permiso para ver el historial de conteos")
+      showError("No tienes permiso para ver el historial de conteos")
+      setIsLoading(false)
+      return
+    }
+
     fetchConteos()
-  }, [filters.status]) // Refetch cuando cambia el filtro de estado
+  }, [filters.status, canView]) // Refetch cuando cambia el filtro de estado o los permisos
 
   // Aplicar filtros cuando cambian
   useEffect(() => {
     applyFilters()
   }, [conteos, filters, searchTerm])
 
+  // Modificar la función fetchConteos para incluir verificación de permisos
   const fetchConteos = async () => {
     try {
+      // Verificar si el usuario tiene permiso para ver los conteos
+      if (!canView) {
+        setError("No tienes permiso para ver el historial de conteos")
+        showError("No tienes permiso para ver el historial de conteos")
+        setIsLoading(false)
+        return
+      }
+
       setIsLoading(true)
       setError(null)
 
@@ -192,8 +222,14 @@ const ConteoHistory = () => {
     }
   }
 
-  // Función para abrir el modal con los detalles
+  // Modificar la función openConteoDetails para incluir verificación de permisos
   const openConteoDetails = (conteo: ConteoData) => {
+    // Verificar si el usuario tiene permiso para ver los detalles
+    if (!canView) {
+      showError("No tienes permiso para ver los detalles del conteo")
+      return
+    }
+
     setSelectedConteo(conteo)
     setIsModalOpen(true)
     // Bloquear scroll del body
@@ -288,13 +324,26 @@ const ConteoHistory = () => {
     }
   }
 
-  // Función para mostrar el popup de confirmación
+  // Modificar la función handleContabilizarClick para incluir verificación de permisos
   const handleContabilizarClick = (conteoId: string) => {
+    // Verificar si el usuario tiene permiso para contabilizar
+    if (!canContabilizar) {
+      showError("No tienes permiso para contabilizar conteos")
+      return
+    }
+
     setShowContabilizarConfirm(conteoId)
   }
 
-  // Función para confirmar la contabilización
+  // Modificar la función confirmContabilizar para incluir verificación de permisos
   const confirmContabilizar = async () => {
+    // Verificar si el usuario tiene permiso para contabilizar
+    if (!canContabilizar) {
+      showError("No tienes permiso para contabilizar conteos")
+      setShowContabilizarConfirm(null)
+      return
+    }
+
     if (showContabilizarConfirm && !isConfirmingContabilizar) {
       setIsConfirmingContabilizar(true)
       try {
@@ -314,18 +363,14 @@ const ConteoHistory = () => {
     }
   }
 
-  // Función para cancelar la contabilización
-  const cancelContabilizar = () => {
-    setShowContabilizarConfirm(null)
-  }
-
-  // Verificar si un conteo puede ser contabilizado (solo si está en estado "procesado")
-  const canContabilizar = (conteo: ConteoData) => {
-    return conteo.estado === "procesado"
-  }
-
-  // Asegurarnos de que estamos enviando correctamente el conteoId al endpoint
+  // Modificar la función handleContabilizar para incluir verificación de permisos
   const handleContabilizar = async (conteoId: string) => {
+    // Verificar si el usuario tiene permiso para contabilizar
+    if (!canContabilizar) {
+      showError("No tienes permiso para contabilizar conteos")
+      return
+    }
+
     try {
       setIsLoading(true)
       setIsContabilizando(true)
@@ -342,7 +387,7 @@ const ConteoHistory = () => {
       console.log("Enviando conteo completo para contabilizar:", conteoToSend._id)
 
       // Llamar al endpoint enviando el objeto completo del conteo
-      const response = await axios.post(`${api_url}/cont/procesa-conteo`, { conteoId : conteoToSend._id })
+      const response = await axios.post(`${api_url}/cont/procesa-conteo`, { conteoId: conteoToSend._id })
 
       console.log("Respuesta de contabilización:", response.data)
 
@@ -365,13 +410,18 @@ const ConteoHistory = () => {
       }
     } catch (error_) {
       console.error("Error al contabilizar conteo:", error_)
-      const errorMessage = (error_ as any)?.response?.data?.message || (error_ as any)?.message || "Error desconocido";
+      const errorMessage = (error_ as any)?.response?.data?.message || (error_ as any)?.message || "Error desconocido"
       showError(`Error al contabilizar: ${errorMessage}`)
     } finally {
       setIsLoading(false)
       setIsContabilizando(false)
       setContabilizandoId(null)
     }
+  }
+
+  // Modificar la función canContabilizar para incluir verificación de permisos
+  const canContabilizarConteo = (conteo: ConteoData) => {
+    return conteo.estado === "procesado" && canContabilizar
   }
 
   return (
@@ -381,70 +431,188 @@ const ConteoHistory = () => {
       {/* Notification Toast */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      <div className="grid grid-cols-1 gap-4">
-        {/* Sección de filtros y búsqueda */}
-        <div className="bg-white dark:bg-boxdark rounded-md shadow-md overflow-hidden border border-gray-100 dark:border-gray-700">
-          <div className="p-4">
-            <div className="flex items-center mb-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-primary mr-2"
-              >
-                <path d="M3 3v18h18"></path>
-                <path d="M18.4 8.79a4 4 0 1 0-7.29 3.21"></path>
-                <path d="M7 19h10"></path>
-                <path d="M7 15h2"></path>
-                <path d="M15 15h2"></path>
-              </svg>
-              <h2 className="text-base font-semibold text-gray-800 dark:text-white">Historial de Conteos</h2>
-            </div>
+      {/* Mostrar mensaje de error si el usuario no tiene permiso para ver los conteos */}
+      {!canView && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+          <strong className="font-bold">Error de permisos:</strong>
+          <span className="block sm:inline"> No tienes permiso para ver el historial de conteos.</span>
+        </div>
+      )}
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              {/* Búsqueda */}
-              <div className="relative flex-grow">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-gray-500 dark:text-gray-400"
-                  >
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.3-4.3"></path>
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Buscar por número de conteo, material o usuario"
-                  className="w-full rounded-md border border-gray-200 bg-transparent py-2 pl-10 pr-4 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/30 dark:text-white dark:focus:border-primary text-sm"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+      {canView && (
+        <div className="grid grid-cols-1 gap-4">
+          {/* Sección de filtros y búsqueda */}
+          <div className="bg-white dark:bg-boxdark rounded-md shadow-md overflow-hidden border border-gray-100 dark:border-gray-700">
+            <div className="p-4">
+              <div className="flex items-center mb-3">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-primary mr-2"
+                >
+                  <path d="M3 3v18h18"></path>
+                  <path d="M18.4 8.79a4 4 0 1 0-7.29 3.21"></path>
+                  <path d="M7 19h10"></path>
+                  <path d="M7 15h2"></path>
+                  <path d="M15 15h2"></path>
+                </svg>
+                <h2 className="text-base font-semibold text-gray-800 dark:text-white">Historial de Conteos</h2>
               </div>
 
-              {/* Botón de refrescar */}
-              <button
-                onClick={refreshData}
-                className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
-                disabled={isLoading}
-              >
-                {isLoading ? (
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                {/* Búsqueda */}
+                <div className="relative flex-grow">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-gray-500 dark:text-gray-400"
+                    >
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Buscar por número de conteo, material o usuario"
+                    className="w-full rounded-md border border-gray-200 bg-transparent py-2 pl-10 pr-4 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/30 dark:text-white dark:focus:border-primary text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                {/* Botón de refrescar */}
+                <button
+                  onClick={refreshData}
+                  className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <svg
+                      className="animate-spin h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                      <path d="M3 3v5h5"></path>
+                    </svg>
+                  )}
+                  <span>{isLoading ? "Cargando..." : "Refrescar"}</span>
+                </button>
+              </div>
+
+              {/* Filtros */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                {/* Filtro por fecha */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Rango de fecha
+                  </label>
+                  <select
+                    className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
+                    value={filters.dateRange}
+                    onChange={(e) => updateFilter("dateRange", e.target.value)}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="today">Hoy</option>
+                    <option value="week">Última semana</option>
+                    <option value="month">Último mes</option>
+                  </select>
+                </div>
+
+                {/* Filtro por estado */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
+                  <select
+                    className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
+                    value={filters.status}
+                    onChange={(e) => updateFilter("status", e.target.value)}
+                  >
+                    <option value="pendiente">Pendiente</option>
+                    <option value="procesado">Procesado</option>
+                    <option value="contabilizado">Contabilizado</option>
+                    <option value="enviado">Enviado</option>
+                    <option value="all">Todos</option>
+                  </select>
+                </div>
+
+                {/* Ordenar por */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Ordenar por</label>
+                  <select
+                    className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
+                    value={filters.sortBy}
+                    onChange={(e) => updateFilter("sortBy", e.target.value)}
+                  >
+                    <option value="date">Fecha</option>
+                    <option value="IBLNR">Número de Conteo</option>
+                  </select>
+                </div>
+
+                {/* Orden */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Orden</label>
+                  <select
+                    className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
+                    value={filters.sortOrder}
+                    onChange={(e) => updateFilter("sortOrder", e.target.value)}
+                  >
+                    <option value="desc">Descendente</option>
+                    <option value="asc">Ascendente</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de resultados */}
+          <div className="bg-white dark:bg-boxdark rounded-md shadow-md overflow-hidden border border-gray-100 dark:border-gray-700">
+            {isLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="flex flex-col items-center">
                   <svg
-                    className="animate-spin h-4 w-4 text-white"
+                    className="animate-spin h-8 w-8 text-primary mb-2"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -463,7 +631,34 @@ const ConteoHistory = () => {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     ></path>
                   </svg>
-                ) : (
+                  <p className="text-gray-600 dark:text-gray-400">Cargando historial de conteos...</p>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="p-6 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 text-red-500 mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" x2="12" y1="8" y2="12"></line>
+                    <line x1="12" x2="12.01" y1="16" y2="16"></line>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Error al cargar datos</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+                <button
+                  onClick={refreshData}
+                  className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -474,228 +669,270 @@ const ConteoHistory = () => {
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    className="mr-2"
                   >
                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
                     <path d="M3 3v5h5"></path>
                   </svg>
-                )}
-                <span>{isLoading ? "Cargando..." : "Refrescar"}</span>
-              </button>
-            </div>
-
-            {/* Filtros */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Filtro por fecha */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Rango de fecha
-                </label>
-                <select
-                  className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
-                  value={filters.dateRange}
-                  onChange={(e) => updateFilter("dateRange", e.target.value)}
-                >
-                  <option value="all">Todos</option>
-                  <option value="today">Hoy</option>
-                  <option value="week">Última semana</option>
-                  <option value="month">Último mes</option>
-                </select>
+                  Reintentar
+                </button>
               </div>
-
-              {/* Filtro por estado */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Estado</label>
-                <select
-                  className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
-                  value={filters.status}
-                  onChange={(e) => updateFilter("status", e.target.value)}
-                >
-                  <option value="pendiente">Pendiente</option>
-                  <option value="procesado">Procesado</option>
-                  <option value="contabilizado">Contabilizado</option>
-                  <option value="enviado">Enviado</option>
-                  <option value="all">Todos</option>
-                </select>
-              </div>
-
-              {/* Ordenar por */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Ordenar por</label>
-                <select
-                  className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
-                  value={filters.sortBy}
-                  onChange={(e) => updateFilter("sortBy", e.target.value)}
-                >
-                  <option value="date">Fecha</option>
-                  <option value="IBLNR">Número de Conteo</option>
-                </select>
-              </div>
-
-              {/* Orden */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Orden</label>
-                <select
-                  className="w-full rounded-md border border-gray-200 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary text-sm"
-                  value={filters.sortOrder}
-                  onChange={(e) => updateFilter("sortOrder", e.target.value)}
-                >
-                  <option value="desc">Descendente</option>
-                  <option value="asc">Ascendente</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabla de resultados */}
-        <div className="bg-white dark:bg-boxdark rounded-md shadow-md overflow-hidden border border-gray-100 dark:border-gray-700">
-          {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <div className="flex flex-col items-center">
-                <svg
-                  className="animate-spin h-8 w-8 text-primary mb-2"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                <p className="text-gray-600 dark:text-gray-400">Cargando historial de conteos...</p>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 text-red-500 mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" x2="12" y1="8" y2="12"></line>
-                  <line x1="12" x2="12.01" y1="16" y2="16"></line>
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Error al cargar datos</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-              <button
-                onClick={refreshData}
-                className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="mr-2"
-                >
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                  <path d="M3 3v5h5"></path>
-                </svg>
-                Reintentar
-              </button>
-            </div>
-          ) : filteredConteos.length === 0 ? (
-            <div className="p-6 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-500 mb-4">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
-                  <line x1="8" x2="16" y1="12" y2="12"></line>
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">No hay registros</h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                No se encontraron conteos con los filtros seleccionados.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Contador de resultados */}
-              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Mostrando <span className="font-semibold text-primary">{filteredConteos.length}</span> resultados
+            ) : filteredConteos.length === 0 ? (
+              <div className="p-6 text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-500 mb-4">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect>
+                    <line x1="8" x2="16" y1="12" y2="12"></line>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">No hay registros</h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  No se encontraron conteos con los filtros seleccionados.
                 </p>
               </div>
+            ) : (
+              <>
+                {/* Contador de resultados */}
+                <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Mostrando <span className="font-semibold text-primary">{filteredConteos.length}</span> resultados
+                  </p>
+                </div>
 
-              {/* Tabla para pantallas medianas y grandes */}
-              <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full table-auto">
-                  <thead>
-                    <tr className="bg-gray-100 dark:bg-gray-700 text-left">
-                      <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Número de Conteo</th>
-                      <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Estado</th>
-                      <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Centro</th>
-                      <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Almacén</th>
-                      <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Usuario</th>
-                      <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Fecha</th>
-                      <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-center">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredConteos.map((conteo) => (
-                      <tr
-                        key={conteo._id}
-                        className="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
-                      >
-                        <td className="py-3 px-4 text-gray-800 dark:text-gray-200 font-medium">{conteo.IBLNR}</td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(conteo.estado)}`}
-                          >
+                {/* Tabla para pantallas medianas y grandes */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full table-auto">
+                    <thead>
+                      <tr className="bg-gray-100 dark:bg-gray-700 text-left">
+                        <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Número de Conteo</th>
+                        <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Estado</th>
+                        <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Centro</th>
+                        <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Almacén</th>
+                        <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Usuario</th>
+                        <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Fecha</th>
+                        <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredConteos.map((conteo) => (
+                        <tr
+                          key={conteo._id}
+                          className="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+                        >
+                          <td className="py-3 px-4 text-gray-800 dark:text-gray-200 font-medium">{conteo.IBLNR}</td>
+                          <td className="py-3 px-4">
                             <span
-                              className={`w-2 h-2 rounded-full mr-1.5 ${
-                                conteo.estado === "pendiente"
-                                  ? "bg-yellow-500"
-                                  : conteo.estado === "procesado"
-                                    ? "bg-blue-500"
-                                    : conteo.estado === "contabilizado"
-                                      ? "bg-green-500"
-                                      : conteo.estado === "enviado"
-                                        ? "bg-purple-500"
-                                        : "bg-gray-500"
-                              }`}
-                            ></span>
-                            {getStatusText(conteo.estado)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{conteo.WERKS}</td>
-                        <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{conteo.LGORT}</td>
-                        <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{conteo.usuarioCreador}</td>
-                        <td className="py-3 px-4 text-gray-800 dark:text-gray-200">
-                          {formatDate(conteo.fechaCreacion)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => openConteoDetails(conteo)}
-                              className="inline-flex items-center justify-center px-3 py-1.5 bg-primary text-white text-xs rounded-md hover:bg-primary/90 transition-colors"
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(conteo.estado)}`}
                             >
+                              <span
+                                className={`w-2 h-2 rounded-full mr-1.5 ${
+                                  conteo.estado === "pendiente"
+                                    ? "bg-yellow-500"
+                                    : conteo.estado === "procesado"
+                                      ? "bg-blue-500"
+                                      : conteo.estado === "contabilizado"
+                                        ? "bg-green-500"
+                                        : conteo.estado === "enviado"
+                                          ? "bg-purple-500"
+                                          : "bg-gray-500"
+                                }`}
+                              ></span>
+                              {getStatusText(conteo.estado)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{conteo.WERKS}</td>
+                          <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{conteo.LGORT}</td>
+                          <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{conteo.usuarioCreador}</td>
+                          <td className="py-3 px-4 text-gray-800 dark:text-gray-200">
+                            {formatDate(conteo.fechaCreacion)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => openConteoDetails(conteo)}
+                                className="inline-flex items-center justify-center px-3 py-1.5 bg-primary text-white text-xs rounded-md hover:bg-primary/90 transition-colors"
+                                disabled={!canView}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="mr-1"
+                                >
+                                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                  <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                Ver detalles
+                              </button>
+
+                              {/* Botón de Contabilizar - Solo visible si el estado es "procesado" y el usuario tiene permiso */}
+                              {canContabilizarConteo(conteo) && (
+                                <button
+                                  onClick={() => handleContabilizarClick(conteo._id)}
+                                  disabled={isContabilizando && contabilizandoId === conteo._id}
+                                  className="inline-flex items-center justify-center px-3 py-1.5 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {isContabilizando && contabilizandoId === conteo._id ? (
+                                    <svg
+                                      className="animate-spin h-4 w-4 text-white mr-1"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <circle
+                                        className="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        strokeWidth="4"
+                                      ></circle>
+                                      <path
+                                        className="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                      ></path>
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="mr-1"
+                                    >
+                                      <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1"></path>
+                                      <path d="M17 3h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1"></path>
+                                      <path d="M12 12v9"></path>
+                                      <path d="m8 17 4 4 4-4"></path>
+                                      <path d="M12 12V3"></path>
+                                    </svg>
+                                  )}
+                                  {isContabilizando && contabilizandoId === conteo._id
+                                    ? "Procesando..."
+                                    : "Contabilizar"}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Vista de tarjetas para móviles */}
+                <div className="sm:hidden space-y-2 p-2">
+                  {filteredConteos.map((conteo, index) => (
+                    <div
+                      key={conteo._id}
+                      className="border border-gray-200 dark:border-gray-600 rounded-xl p-3 bg-white dark:bg-boxdark shadow-sm hover:shadow-md transition-all duration-500 animate-in fade-in-50 zoom-in-90"
+                      style={{ animationDelay: `${index * 150}ms` }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold text-gray-800 dark:text-white text-base">{conteo.IBLNR}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-1">
+                            {formatDate(conteo.fechaCreacion)}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(conteo.estado)}`}
+                        >
+                          {getStatusText(conteo.estado)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                        <div>
+                          <p className="text-gray-500 dark:text-gray-400">Centro:</p>
+                          <p className="font-medium text-gray-800 dark:text-white">{conteo.WERKS}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 dark:text-gray-400">Almacén:</p>
+                          <p className="font-medium text-gray-800 dark:text-white">{conteo.LGORT}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500 dark:text-gray-400">Usuario:</p>
+                          <p className="font-medium text-gray-800 dark:text-white">{conteo.usuarioCreador}</p>
+                        </div>
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div className="flex flex-wrap items-center justify-between mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 gap-2">
+                        <button
+                          onClick={() => openConteoDetails(conteo)}
+                          className="inline-flex items-center justify-center px-3 py-1.5 bg-primary text-white text-xs rounded-md hover:bg-primary/90 transition-colors min-w-20"
+                          disabled={!canView}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="mr-1"
+                          >
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                          Ver detalles
+                        </button>
+
+                        {/* Botón de Contabilizar para móviles - Solo visible si el estado es "procesado" y el usuario tiene permiso */}
+                        {canContabilizarConteo(conteo) && (
+                          <button
+                            onClick={() => handleContabilizarClick(conteo._id)}
+                            disabled={isContabilizando && contabilizandoId === conteo._id}
+                            className="inline-flex items-center justify-center px-3 py-1.5 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-20"
+                          >
+                            {isContabilizando && contabilizandoId === conteo._id ? (
+                              <svg
+                                className="animate-spin h-4 w-4 text-white mr-1"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                ></circle>
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                              </svg>
+                            ) : (
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 width="14"
@@ -708,191 +945,25 @@ const ConteoHistory = () => {
                                 strokeLinejoin="round"
                                 className="mr-1"
                               >
-                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1"></path>
+                                <path d="M17 3h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1"></path>
+                                <path d="M12 12v9"></path>
+                                <path d="m8 17 4 4 4-4"></path>
+                                <path d="M12 12V3"></path>
                               </svg>
-                              Ver detalles
-                            </button>
-
-                            {/* Botón de Contabilizar - Solo visible si el estado es "procesado" */}
-                            {canContabilizar(conteo) && (
-                              <button
-                                onClick={() => handleContabilizarClick(conteo._id)}
-                                disabled={isContabilizando && contabilizandoId === conteo._id}
-                                className="inline-flex items-center justify-center px-3 py-1.5 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isContabilizando && contabilizandoId === conteo._id ? (
-                                  <svg
-                                    className="animate-spin h-4 w-4 text-white mr-1"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <circle
-                                      className="opacity-25"
-                                      cx="12"
-                                      cy="12"
-                                      r="10"
-                                      stroke="currentColor"
-                                      strokeWidth="4"
-                                    ></circle>
-                                    <path
-                                      className="opacity-75"
-                                      fill="currentColor"
-                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                    ></path>
-                                  </svg>
-                                ) : (
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="mr-1"
-                                  >
-                                    <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1"></path>
-                                    <path d="M17 3h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1"></path>
-                                    <path d="M12 12v9"></path>
-                                    <path d="m8 17 4 4 4-4"></path>
-                                    <path d="M12 12V3"></path>
-                                  </svg>
-                                )}
-                                {isContabilizando && contabilizandoId === conteo._id ? "Procesando..." : "Contabilizar"}
-                              </button>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Vista de tarjetas para móviles */}
-              <div className="sm:hidden space-y-2 p-2">
-                {filteredConteos.map((conteo, index) => (
-                  <div
-                    key={conteo._id}
-                    className="border border-gray-200 dark:border-gray-600 rounded-xl p-3 bg-white dark:bg-boxdark shadow-sm hover:shadow-md transition-all duration-500 animate-in fade-in-50 zoom-in-90"
-                    style={{ animationDelay: `${index * 150}ms` }}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-gray-800 dark:text-white text-base">{conteo.IBLNR}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-1">
-                          {formatDate(conteo.fechaCreacion)}
-                        </p>
-                      </div>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(conteo.estado)}`}
-                      >
-                        {getStatusText(conteo.estado)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Centro:</p>
-                        <p className="font-medium text-gray-800 dark:text-white">{conteo.WERKS}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Almacén:</p>
-                        <p className="font-medium text-gray-800 dark:text-white">{conteo.LGORT}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Usuario:</p>
-                        <p className="font-medium text-gray-800 dark:text-white">{conteo.usuarioCreador}</p>
+                            {isContabilizando && contabilizandoId === conteo._id ? "..." : "Contabilizar"}
+                          </button>
+                        )}
                       </div>
                     </div>
-
-                    {/* Botones de acción */}
-                    <div className="flex flex-wrap items-center justify-between mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 gap-2">
-                      <button
-                        onClick={() => openConteoDetails(conteo)}
-                        className="inline-flex items-center justify-center px-3 py-1.5 bg-primary text-white text-xs rounded-md hover:bg-primary/90 transition-colors min-w-20"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="mr-1"
-                        >
-                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
-                          <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                        Ver detalles
-                      </button>
-
-                      {/* Botón de Contabilizar para móviles - Solo visible si el estado es "procesado" */}
-                      {canContabilizar(conteo) && (
-                        <button
-                          onClick={() => handleContabilizarClick(conteo._id)}
-                          disabled={isContabilizando && contabilizandoId === conteo._id}
-                          className="inline-flex items-center justify-center px-3 py-1.5 bg-green-600 text-white text-xs rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-20"
-                        >
-                          {isContabilizando && contabilizandoId === conteo._id ? (
-                            <svg
-                              className="animate-spin h-4 w-4 text-white mr-1"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                          ) : (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="mr-1"
-                            >
-                              <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1"></path>
-                              <path d="M17 3h1a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-1"></path>
-                              <path d="M12 12v9"></path>
-                              <path d="m8 17 4 4 4-4"></path>
-                              <path d="M12 12V3"></path>
-                            </svg>
-                          )}
-                          {isContabilizando && contabilizandoId === conteo._id ? "..." : "Contabilizar"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Modal de detalles */}
       {isModalOpen && selectedConteo && (
@@ -1248,8 +1319,8 @@ const ConteoHistory = () => {
 
             {/* Footer con botón de cerrar y contabilizar */}
             <div className="sticky bottom-0 z-10 flex justify-between px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-b-xl">
-              {/* Botón de Contabilizar - Solo visible si el estado es "procesado" */}
-              {canContabilizar(selectedConteo) && (
+              {/* Botón de Contabilizar - Solo visible si el estado es "procesado" y el usuario tiene permiso */}
+              {canContabilizarConteo(selectedConteo) && (
                 <button
                   onClick={() => handleContabilizarClick(selectedConteo._id)}
                   disabled={isContabilizando && contabilizandoId === selectedConteo._id}

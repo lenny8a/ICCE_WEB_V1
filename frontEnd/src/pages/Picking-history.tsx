@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useEffect } from "react"
 import Breadcrumb from "../components/Breadcrumbs/Breadcrumb"
 import axios from "axios"
@@ -92,9 +94,18 @@ const PickingHistory = () => {
   const [showAnularConfirm, setShowAnularConfirm] = useState<string | null>(null)
   const { checkPermission } = useAuth()
 
-  const canProcess = checkPermission("/salida/sal_merca", "contabilizar");
-  const canAnular  = checkPermission("/salida/sal_merca", "anular");
+  const canView    = checkPermission("/salida/sal_merca", "visualizar")
+  const canProcess = checkPermission("/salida/sal_merca", "contabilizar")
+  const canAnular  = checkPermission("/salida/sal_merca", "anular")
+
+  // Verificar permisos al cargar el componente
+  useEffect(() => {
+    if (!canView) {
   
+      // Aquí podrías redirigir al usuario a otra página si lo deseas
+    }
+  }, [canView])
+
   const api_url = import.meta.env.VITE_API_URL
 
   // Cargar los datos al montar el componente
@@ -250,11 +261,19 @@ const PickingHistory = () => {
 
   // Replace the existing handleContabilizar function with this version that uses the confirmation popup
   const handleContabilizarClick = (pickingId: string) => {
+    if (!canProcess) {
+
+      return
+    }
     setShowContabilizarConfirm(pickingId)
   }
 
   // Replace the existing handleAnular function with this version that uses the confirmation popup
   const handleAnularClick = (pickingId: string) => {
+    if (!canAnular) {
+
+      return
+    }
     setShowAnularConfirm(pickingId)
   }
 
@@ -296,6 +315,11 @@ const PickingHistory = () => {
   // Reemplazar la función handleContabilizar completa con esta nueva versión:
 
   const handleContabilizar = async (pickingId: string) => {
+    if (!canProcess) {
+
+      return
+    }
+
     try {
       setIsContabilizing(pickingId)
 
@@ -316,7 +340,7 @@ const PickingHistory = () => {
           zubic: item.location,
           cases: item.case,
           werks: item.werks,
-          lgort: item.lgort
+          lgort: item.lgort,
         })),
       }
 
@@ -404,6 +428,10 @@ const PickingHistory = () => {
 
   // Nueva función para anular un picking contabilizado
   const handleAnular = async (pickingId: string) => {
+    if (!canAnular) {
+      return
+    }
+
     try {
       setIsAnulando(pickingId)
 
@@ -555,20 +583,22 @@ const PickingHistory = () => {
   // Función para verificar si un picking puede ser contabilizado
   const canBeContabilized = (picking: PickingData) => {
     // Solo se puede contabilizar si:
-    // 1. El estado es "completed" (no "accounted")
-    // 2. No está marcado como contabilizado
-    // 3. No tiene un código MBLNR asignado
-    // 4. No está anulado
-    return picking.status === "completed" && !picking.contabilizado && !picking.mblnr && !picking.anulado
+    // 1. El usuario tiene permisos para contabilizar
+    // 2. El estado es "completed" (no "accounted")
+    // 3. No está marcado como contabilizado
+    // 4. No tiene un código MBLNR asignado
+    // 5. No está anulado
+    return canProcess && picking.status === "completed" && !picking.contabilizado && !picking.mblnr && !picking.anulado
   }
 
   // Función para verificar si un picking puede ser anulado
   const canBeAnulado = (picking: PickingData) => {
     // Solo se puede anular si:
-    // 1. El estado es "accounted" o está contabilizado
-    // 2. Tiene un código MBLNR asignado
-    // 3. No está ya anulado
-    return (picking.status === "accounted" || picking.contabilizado) && picking.mblnr && !picking.anulado
+    // 1. El usuario tiene permisos para anular
+    // 2. El estado es "accounted" o está contabilizado
+    // 3. Tiene un código MBLNR asignado
+    // 4. No está ya anulado
+    return canAnular && (picking.status === "accounted" || picking.contabilizado) && picking.mblnr && !picking.anulado
   }
 
   return (
@@ -965,9 +995,8 @@ const PickingHistory = () => {
                               Ver detalles
                             </button>
 
-                          
                             {canBeContabilized(picking) ? (
-                               canProcess && <button
+                              <button
                                 onClick={() => handleContabilizarClick(picking._id)}
                                 disabled={isContabilizing === picking._id}
                                 className="inline-flex items-center justify-center px-3 py-1.5 bg-success text-white text-xs rounded-md hover:bg-success/90 transition-colors disabled:bg-gray-400 w-28"
@@ -1013,7 +1042,7 @@ const PickingHistory = () => {
                                 Contabilizar
                               </button>
                             ) : canBeAnulado(picking) ? (
-                             canAnular && <button
+                              <button
                                 onClick={() => handleAnularClick(picking._id)}
                                 disabled={isAnulando === picking._id}
                                 className="inline-flex items-center justify-center px-3 py-1.5 bg-red-500 text-white text-xs rounded-md hover:bg-red-600 transition-colors disabled:bg-gray-400 w-28"

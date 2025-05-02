@@ -1,3 +1,5 @@
+"use client"
+
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import axios from "axios"
@@ -6,6 +8,7 @@ import ToastContainer from "../components/ToastContainer"
 import ErrorMessage from "../components/ErrorMessage"
 import { useForm } from "react-hook-form"
 import Breadcrumb from "../components/Breadcrumbs/Breadcrumb"
+import { useDeviceDetect } from "../hooks/use-device-detect"
 
 // First, make sure we have all the necessary Lucide React imports at the top
 // Keep the existing imports and add any missing ones
@@ -37,6 +40,10 @@ import {
   Store,
   MapPin,
 } from "lucide-react"
+
+// Importar useAuth para acceder al contexto de autenticación
+// Añadir esta importación junto con las otras importaciones al inicio del archivo
+import { useAuth } from "../context/AuthContext"
 
 // Definimos los estilos CSS directamente en un componente
 const ResponsiveStyles: React.FC = () => {
@@ -227,6 +234,94 @@ const ResponsiveStyles: React.FC = () => {
         margin: 0 auto;
         margin-bottom: 1rem;
       }
+
+      /* Specific styles for handheld devices (480x800) */
+      @media (max-width: 480px) {
+        .handheld-container {
+          padding: 0.5rem !important;
+          margin: 0.25rem !important;
+        }
+        
+        .handheld-text-sm {
+          font-size: 0.75rem !important;
+        }
+        
+        .handheld-text-base {
+          font-size: 0.875rem !important;
+        }
+        
+        .handheld-p-2 {
+          padding: 0.5rem !important;
+        }
+        
+        .handheld-my-1 {
+          margin-top: 0.25rem !important;
+          margin-bottom: 0.25rem !important;
+        }
+        
+        .handheld-compact-form input,
+        .handheld-compact-form button {
+          height: 2.5rem;
+        }
+        
+        .handheld-compact-table th,
+        .handheld-compact-table td {
+          padding: 0.5rem 0.25rem !important;
+          font-size: 0.75rem !important;
+        }
+        
+        .handheld-grid-cols-1 {
+          grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+        }
+        
+        .handheld-w-full {
+          width: 100% !important;
+        }
+        
+        .handheld-flex-col {
+          flex-direction: column !important;
+        }
+        
+        .handheld-gap-1 {
+          gap: 0.25rem !important;
+        }
+        
+        .handheld-text-xs {
+          font-size: 0.7rem !important;
+        }
+        
+        .handheld-py-1 {
+          padding-top: 0.25rem !important;
+          padding-bottom: 0.25rem !important;
+        }
+        
+        .handheld-px-2 {
+          padding-left: 0.5rem !important;
+          padding-right: 0.5rem !important;
+        }
+        
+        .handheld-modal {
+          width: 95% !important;
+          max-height: 85vh !important;
+          margin: 0 auto !important;
+        }
+        
+        .handheld-modal-content {
+          padding: 0.5rem !important;
+        }
+        
+        .handheld-modal-header {
+          padding: 0.5rem !important;
+        }
+        
+        .handheld-modal-footer {
+          padding: 0.5rem !important;
+        }
+        
+        .handheld-max-h-60vh {
+          max-height: 60vh !important;
+        }
+      }
     `
     document.head.appendChild(styleElement)
 
@@ -290,6 +385,7 @@ interface ConteoMaterial {
 
 // Add this CSS class at the beginning of your component
 const ConteosScreen: React.FC = () => {
+  const { isHandheld } = useDeviceDetect()
   // Add this line to define a responsive utility class
   const initialState = {
     conteo: "",
@@ -360,6 +456,9 @@ const ConteosScreen: React.FC = () => {
   const [] = useState(false)
   const { toasts, removeToast, success, error } = useToast()
 
+  // Añadir después de la línea: const { toasts, removeToast, success, error } = useToast()
+  const { checkPermission } = useAuth()
+
   // Agregar un nuevo estado para almacenar los cases procesados por material
   const [materialCasesMap, setMaterialCasesMap] = useState<Record<string, ConteoCase[]>>({})
   const [viewingProcessedCases, setViewingProcessedCases] = useState<Material | null>(null)
@@ -412,6 +511,12 @@ const ConteosScreen: React.FC = () => {
     }
   }, [ubicacionValue, caseValue, editingCase])
 
+  // Añadir después de todas las declaraciones de estado:
+  // Definir los permisos necesarios
+  const canView = checkPermission("/cont/conteos", "visualizar")
+  const canModify = checkPermission("/cont/conteos", "modificar")
+  const canProcess = checkPermission("/cont/conteos", "contabilizar")
+
   // Agregar este useEffect para filtrar los materiales cuando cambia el término de búsqueda o los datos
   useEffect(() => {
     if (!conteoData) return
@@ -438,6 +543,13 @@ const ConteosScreen: React.FC = () => {
       )
     }
   }, [conteoData, procesados, searchTerm])
+
+  // Añadir verificación de acceso inicial después de todos los useEffect
+  useEffect(() => {
+    if (!canView) {
+      error("No tienes permisos para acceder a esta página")
+    }
+  }, [canView, error])
 
   // Function to validate if ubicacion exists - Modificada para usar estados de error
   const validateUbicacion = (ubicacion: string): boolean => {
@@ -519,7 +631,13 @@ const ConteosScreen: React.FC = () => {
   }
 
   // Modificar la función handleSearch para inicializar los estados de filtrado
+  // Reemplazar el inicio de la función handleSearch:
   const handleSearch = async (formData: ConteoForm) => {
+    if (!canView) {
+      error("No tienes permisos para ver documentos de inventario")
+      return
+    }
+
     try {
       setIsSearching(true)
       setShowConteo(false)
@@ -682,10 +800,18 @@ const ConteosScreen: React.FC = () => {
     }
   }
 
+  // Modificar la función openConteoModal para verificar permisos
+  // Reemplazar el inicio de la función openConteoModal:
   const openConteoModal = (material: Material, loadProcessedCases = false) => {
     // Verificar si el conteo está procesado o contabilizado
     if (conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado") {
       error(`No se pueden realizar modificaciones. El conteo está en estado: ${conteoData.estado}`)
+      return
+    }
+
+    // Verificar permisos
+    if (!canModify) {
+      error("No tienes permisos para modificar documentos de inventario")
       return
     }
 
@@ -927,7 +1053,15 @@ const ConteosScreen: React.FC = () => {
   }
 
   // Función para eliminar un case registrado
+  // Modificar la función handleDeleteCase para verificar permisos
+  // Reemplazar el inicio de la función handleDeleteCase:
   const handleDeleteCase = (caseItem: ConteoCase) => {
+    // Verificar permisos
+    if (!canModify) {
+      error("No tienes permisos para eliminar cases de documentos de inventario")
+      return
+    }
+
     // Encontrar el case original en los datos del material
     const originalCase = selectedMaterial?.CASES.find((c) => {
       const normalizedDataCase = c.CASE.replace(/^0+/, "")
@@ -962,12 +1096,20 @@ const ConteosScreen: React.FC = () => {
     success(`Case ${caseItem.case} eliminado correctamente`)
   }
 
+  // Modificar la función handleEditProcessedCase para verificar permisos
+  // Reemplazar el inicio de la función handleEditProcessedCase:
   const handleEditProcessedCase = (caseItem: ConteoCase, material: Material | null) => {
     if (!material) return
 
     // Verificar si el conteo está procesado o contabilizado
     if (conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado") {
       error(`No se pueden realizar modificaciones. El conteo está en estado: ${conteoData.estado}`)
+      return
+    }
+
+    // Verificar permisos
+    if (!canModify) {
+      error("No tienes permisos para modificar documentos de inventario")
       return
     }
 
@@ -1077,6 +1219,8 @@ const ConteosScreen: React.FC = () => {
   // Buscar la función procesarConteo y reemplazarla con:
 
   // Reemplazar la función procesarConteo existente con esta nueva implementación
+  // Modificar la función procesarConteo para verificar permisos
+  // Reemplazar el inicio de la función procesarConteo:
   const procesarConteo = () => {
     // Verificar si hay materiales procesados
     if (procesados.length === 0) {
@@ -1090,6 +1234,12 @@ const ConteosScreen: React.FC = () => {
       return
     }
 
+    // Verificar permisos
+    if (!canProcess) {
+      error("No tienes permisos para procesar documentos de inventario")
+      return
+    }
+
     // Mostrar el modal de confirmación
     setIsProcessModalOpen(true)
   }
@@ -1098,7 +1248,15 @@ const ConteosScreen: React.FC = () => {
   // Buscar la función handleConfirmProcess y reemplazarla con:
 
   // Modificar la función handleConfirmProcess para asegurar que se guarde el estado como "procesado"
+  // Modificar la función handleConfirmProcess para verificar permisos
+  // Reemplazar el inicio de la función handleConfirmProcess:
   const handleConfirmProcess = async () => {
+    if (!canProcess) {
+      error("No tienes permisos para procesar documentos de inventario")
+      setIsProcessModalOpen(false)
+      return
+    }
+
     setIsProcessing(true)
 
     try {
@@ -1200,10 +1358,18 @@ const ConteosScreen: React.FC = () => {
     document.body.style.overflow = "auto"
   }
 
+  // Modificar la función deleteMaterialProcessing para verificar permisos
+  // Reemplazar el inicio de la función deleteMaterialProcessing:
   const deleteMaterialProcessing = (material: Material) => {
     // Verificar si el conteo está procesado o contabilizado
     if (conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado") {
       error(`No se pueden realizar modificaciones. El conteo está en estado: ${conteoData.estado}`)
+      return
+    }
+
+    // Verificar permisos
+    if (!canModify) {
+      error("No tienes permisos para eliminar materiales de documentos de inventario")
       return
     }
 
@@ -1220,7 +1386,14 @@ const ConteosScreen: React.FC = () => {
     success(`Material ${material.MATNR} eliminado de procesados`)
   }
 
+  // Modificar la función handleSaveConteo para verificar permisos
+  // Reemplazar el inicio de la función handleSaveConteo:
   const handleSaveConteo = () => {
+    if (!canModify) {
+      error("No tienes permisos para guardar documentos de inventario")
+      return
+    }
+
     setIsSaving(true)
 
     try {
@@ -1267,6 +1440,8 @@ const ConteosScreen: React.FC = () => {
     }
   }
 
+  // Modificar la función handleSaveAllToDB para verificar permisos
+  // Reemplazar el inicio de la función handleSaveAllToDB:
   const handleSaveAllToDB = async () => {
     // Verificar si hay materiales procesados
     if (procesados.length === 0) {
@@ -1277,6 +1452,12 @@ const ConteosScreen: React.FC = () => {
     // Verificar si el conteo está procesado o contabilizado
     if (conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado") {
       error(`No se pueden realizar modificaciones. El conteo está en estado: ${conteoData.estado}`)
+      return
+    }
+
+    // Verificar permisos
+    if (!canModify) {
+      error("No tienes permisos para guardar documentos de inventario")
       return
     }
 
@@ -1407,10 +1588,18 @@ const ConteosScreen: React.FC = () => {
     }, 3000)
   }
 
+  // Modificar la función handleModifyMaterial para verificar permisos
+  // Reemplazar el inicio de la función handleModifyMaterial:
   const handleModifyMaterial = (material: Material) => {
     // Verificar si el conteo está procesado o contabilizado
     if (conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado") {
       error(`No se pueden realizar modificaciones. El conteo está en estado: ${conteoData.estado}`)
+      return
+    }
+
+    // Verificar permisos
+    if (!canModify) {
+      error("No tienes permisos para modificar documentos de inventario")
       return
     }
 
@@ -1454,13 +1643,15 @@ const ConteosScreen: React.FC = () => {
       <Breadcrumb pageName="Documentos de Inventario" />
       <div className="grid grid-cols-1 gap-4 mt-4">
         {/* Formulario de búsqueda - Mantenido exactamente igual */}
-        <div className="bg-white dark:bg-boxdark rounded-md shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700 transition-all duration-300 hover:shadow-md">
-          <div className="p-4">
+        <div
+          className={`bg-white dark:bg-boxdark rounded-md shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700 transition-all duration-300 hover:shadow-md ${isHandheld ? "handheld-container" : ""}`}
+        >
+          <div className={`p-4 ${isHandheld ? "handheld-p-2" : ""}`}>
             <div className="flex items-center mb-3">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
+                width={isHandheld ? "16" : "20"}
+                height={isHandheld ? "16" : "20"}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -1473,17 +1664,23 @@ const ConteosScreen: React.FC = () => {
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                 <path d="m9 14 2 2 4-4" />
               </svg>
-              <h2 className="text-base font-semibold text-gray-800 dark:text-white">Buscar Documento de Inventario</h2>
+              <h2
+                className={`text-base font-semibold text-gray-800 dark:text-white ${isHandheld ? "handheld-text-sm" : ""}`}
+              >
+                Buscar Documento de Inventario
+              </h2>
             </div>
 
-            <form onSubmit={handleSubmit(handleSearch)}>
-              <div className="flex flex-col sm:flex-row items-center">
+            <form onSubmit={handleSubmit(handleSearch)} className={isHandheld ? "handheld-compact-form" : ""}>
+              <div
+                className={`flex ${isHandheld ? "handheld-flex-col handheld-gap-1" : "flex-col sm:flex-row"} items-center`}
+              >
                 <div className="relative flex-grow w-full mb-2 sm:mb-0">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
+                      width={isHandheld ? "14" : "16"}
+                      height={isHandheld ? "14" : "16"}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -1500,13 +1697,13 @@ const ConteosScreen: React.FC = () => {
                     id="conteo"
                     type="text"
                     placeholder="Ingrese número de documento de inventario"
-                    className="w-full rounded-md sm:rounded-l-md sm:rounded-r-none border border-gray-200 bg-transparent py-2 pl-10 pr-4 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/30 dark:text-white text-sm"
+                    className={`w-full rounded-md ${isHandheld ? "sm:rounded-md handheld-text-sm" : "sm:rounded-l-md sm:rounded-r-none"} border border-gray-200 bg-transparent py-2 pl-10 pr-4 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/30 dark:text-white text-sm`}
                     {...register("conteo", { required: "El número de documento de inventario es obligatorio" })}
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto flex items-center justify-center gap-1 rounded-md sm:rounded-l-none sm:rounded-r-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md disabled:bg-opacity-70 border border-primary"
+                  className={`w-full sm:w-auto flex items-center justify-center gap-1 rounded-md ${isHandheld ? "sm:rounded-md handheld-text-xs" : "sm:rounded-l-none sm:rounded-r-md"} bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md disabled:bg-opacity-70 border border-primary`}
                   disabled={isSearching}
                 >
                   {isSearching ? (
@@ -1537,8 +1734,8 @@ const ConteosScreen: React.FC = () => {
                     <>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
+                        width={isHandheld ? "14" : "16"}
+                        height={isHandheld ? "14" : "16"}
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -1564,17 +1761,25 @@ const ConteosScreen: React.FC = () => {
         {/* And replace it with: */}
 
         {conteoData && showConteo && (
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-boxdark overflow-hidden transition-all duration-300 animate-fadeIn">
-            <div className="p-4 sm:p-6">
+          <div
+            className={`rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-boxdark overflow-hidden transition-all duration-300 animate-fadeIn ${isHandheld ? "handheld-container" : ""}`}
+          >
+            <div className={`${isHandheld ? "p-2 sm:p-3" : "p-4 sm:p-6"}`}>
               {/* Cabecera del conteo - Mejorada */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              <div
+                className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 ${isHandheld ? "mb-3 gap-2" : ""}`}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
-                    <FileSpreadsheet size={20} />
+                  <div
+                    className={`flex items-center justify-center ${isHandheld ? "w-8 h-8" : "w-10 h-10"} rounded-full bg-primary/10 text-primary`}
+                  >
+                    <FileSpreadsheet size={isHandheld ? 16 : 20} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                      <h2
+                        className={`${isHandheld ? "text-base handheld-text-base" : "text-lg"} font-semibold text-gray-800 dark:text-white flex items-center gap-2`}
+                      >
                         <span>Documento:</span>
                         <span className="text-primary">{conteoData.IBLNR}</span>
                       </h2>
@@ -1582,9 +1787,11 @@ const ConteosScreen: React.FC = () => {
                         <div className="ml-2 animate-fadeIn">{renderConteoStatus(conteoData.estado)}</div>
                       )}
                     </div>
-                    <div className="flex items-center mt-1 text-sm text-gray-500 dark:text-gray-400 gap-2">
+                    <div
+                      className={`flex items-center mt-1 ${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} text-gray-500 dark:text-gray-400 gap-2`}
+                    >
                       <span className="flex items-center gap-1">
-                        <Package size={14} />
+                        <Package size={isHandheld ? 12 : 14} />
                         <span>
                           Materiales: <span className="font-medium">{conteoData.MATERIALES.length}</span>
                         </span>
@@ -1592,46 +1799,51 @@ const ConteosScreen: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                <div
+                  className={`flex ${isHandheld ? "flex-col handheld-flex-col gap-1 handheld-gap-1" : "flex-col sm:flex-row"} items-start sm:items-center gap-2 w-full sm:w-auto`}
+                >
                   <button
                     onClick={handleSaveAllToDB}
                     disabled={
                       isSavingGlobal ||
                       procesados.length === 0 ||
                       conteoData?.estado === "procesado" ||
-                      conteoData?.estado === "contabilizado"
+                      conteoData?.estado === "contabilizado" ||
+                      !canModify
                     }
-                    className="bg-blue-500 text-white px-4 py-2 rounded-md text-sm w-full sm:w-auto flex items-center justify-center gap-2 hover:bg-blue-600 transition-all duration-300 font-medium disabled:opacity-70 disabled:cursor-not-allowed"
+                    className={`bg-blue-500 text-white ${isHandheld ? "px-3 py-1.5 handheld-py-1 handheld-px-2 handheld-text-xs" : "px-4 py-2"} rounded-md text-sm w-full sm:w-auto flex items-center justify-center gap-2 hover:bg-blue-600 transition-all duration-300 font-medium disabled:opacity-70 disabled:cursor-not-allowed`}
                   >
                     {isSavingGlobal ? (
                       <>
-                        <Loader2 size={16} className="animate-spin" />
+                        <Loader2 size={isHandheld ? 14 : 16} className="animate-spin" />
                         <span>Guardando...</span>
                       </>
                     ) : (
                       <>
-                        <Save size={16} />
+                        <Save size={isHandheld ? 14 : 16} />
                         <span>Guardar</span>
                       </>
                     )}
                   </button>
                   <button
                     onClick={procesarConteo}
-                    disabled={conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado"}
-                    className={`bg-success text-white px-4 py-2 rounded-md text-sm w-full sm:w-auto flex items-center justify-center gap-2 hover:bg-success/90 transition-all duration-300 font-medium ${
-                      conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado"
+                    disabled={
+                      conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado" || !canProcess
+                    }
+                    className={`bg-success text-white ${isHandheld ? "px-3 py-1.5 handheld-py-1 handheld-px-2 handheld-text-xs" : "px-4 py-2"} rounded-md text-sm w-full sm:w-auto flex items-center justify-center gap-2 hover:bg-success/90 transition-all duration-300 font-medium ${
+                      conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado" || !canProcess
                         ? "opacity-50 cursor-not-allowed"
                         : ""
                     }`}
                   >
-                    <BarChart4 size={16} />
+                    <BarChart4 size={isHandheld ? 14 : 16} />
                     <span>Procesar</span>
                   </button>
                   <button
                     onClick={handleNewSearch}
-                    className="bg-primary text-white px-4 py-2 rounded-md text-sm w-full sm:w-auto flex items-center justify-center gap-2 hover:bg-primary/90 transition-all duration-300 font-medium"
+                    className={`bg-primary text-white ${isHandheld ? "px-3 py-1.5 handheld-py-1 handheld-px-2 handheld-text-xs" : "px-4 py-2"} rounded-md text-sm w-full sm:w-auto flex items-center justify-center gap-2 hover:bg-primary/90 transition-all duration-300 font-medium`}
                   >
-                    <RefreshCw size={16} />
+                    <RefreshCw size={isHandheld ? 14 : 16} />
                     <span>Nueva búsqueda</span>
                   </button>
                 </div>
@@ -1639,45 +1851,90 @@ const ConteosScreen: React.FC = () => {
 
               {/* Información del conteo - Mejorada */}
               {/* Información del conteo - Versión compacta */}
-              <div className="mb-4 bg-gray-50 dark:bg-gray-800/30 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
-                <div className="grid grid-cols-2 xs:grid-cols-3 md:grid-cols-5 gap-3">
+              <div
+                className={`mb-4 bg-gray-50 dark:bg-gray-800/30 ${isHandheld ? "p-2 handheld-p-2" : "p-3"} rounded-lg border border-gray-100 dark:border-gray-700`}
+              >
+                <div
+                  className={`grid ${isHandheld ? "grid-cols-2 handheld-grid-cols-1 gap-2 handheld-gap-1" : "grid-cols-2 xs:grid-cols-3 md:grid-cols-5 gap-3"}`}
+                >
                   <div className="flex items-center gap-1.5">
-                    <User size={18} className="text-gray-400 flex-shrink-0" />
+                    <User size={isHandheld ? 16 : 18} className="text-gray-400 flex-shrink-0" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 leading-tight">Creado por</p>
-                      <p className="font-medium text-gray-800 dark:text-white text-sm">{conteoData.USNAM}</p>
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-xs"} font-medium text-gray-500 dark:text-gray-400 leading-tight`}
+                      >
+                        Creado por
+                      </p>
+                      <p
+                        className={`font-medium text-gray-800 dark:text-white ${isHandheld ? "text-xs handheld-text-xs" : "text-sm"}`}
+                      >
+                        {conteoData.USNAM}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Calendar size={18} className="text-gray-400 flex-shrink-0" />
+                    <Calendar size={isHandheld ? 16 : 18} className="text-gray-400 flex-shrink-0" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 leading-tight">Fecha</p>
-                      <p className="font-medium text-gray-800 dark:text-white text-sm">{conteoData.BLDAT}</p>
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-xs"} font-medium text-gray-500 dark:text-gray-400 leading-tight`}
+                      >
+                        Fecha
+                      </p>
+                      <p
+                        className={`font-medium text-gray-800 dark:text-white ${isHandheld ? "text-xs handheld-text-xs" : "text-sm"}`}
+                      >
+                        {conteoData.BLDAT}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Building2 size={18} className="text-gray-400 flex-shrink-0" />
+                    <Building2 size={isHandheld ? 16 : 18} className="text-gray-400 flex-shrink-0" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 leading-tight">Centro</p>
-                      <p className="font-medium text-gray-800 dark:text-white text-sm">{conteoData.WERKS}</p>
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-xs"} font-medium text-gray-500 dark:text-gray-400 leading-tight`}
+                      >
+                        Centro
+                      </p>
+                      <p
+                        className={`font-medium text-gray-800 dark:text-white ${isHandheld ? "text-xs handheld-text-xs" : "text-sm"}`}
+                      >
+                        {conteoData.WERKS}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Store size={18} className="text-gray-400 flex-shrink-0" />
+                    <Store size={isHandheld ? 16 : 18} className="text-gray-400 flex-shrink-0" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 leading-tight">Almacén</p>
-                      <p className="font-medium text-gray-800 dark:text-white text-sm">{conteoData.LGORT}</p>
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-xs"} font-medium text-gray-500 dark:text-gray-400 leading-tight`}
+                      >
+                        Almacén
+                      </p>
+                      <p
+                        className={`font-medium text-gray-800 dark:text-white ${isHandheld ? "text-xs handheld-text-xs" : "text-sm"}`}
+                      >
+                        {conteoData.LGORT}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <FileText size={18} className="text-gray-400 flex-shrink-0" />
+                    <FileText size={isHandheld ? 16 : 18} className="text-gray-400 flex-shrink-0" />
                     <div>
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 leading-tight">Referencia</p>
-                      <p className="font-medium text-gray-800 dark:text-white text-sm">{conteoData.XBLNI}</p>
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-xs"} font-medium text-gray-500 dark:text-gray-400 leading-tight`}
+                      >
+                        Referencia
+                      </p>
+                      <p
+                        className={`font-medium text-gray-800 dark:text-white ${isHandheld ? "text-xs handheld-text-xs" : "text-sm"}`}
+                      >
+                        {conteoData.XBLNI}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
+
               {conteoData.estado && (
                 <div
                   className="mb-4 p-3 rounded-lg border animate-fadeIn"
@@ -1726,47 +1983,53 @@ const ConteosScreen: React.FC = () => {
               )}
 
               {/* Sistema de pestañas para materiales - Mejorado */}
-              <div className="mb-8">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+              <div className={`mb-8 ${isHandheld ? "mb-4" : ""}`}>
+                <div
+                  className={`flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 ${isHandheld ? "mb-2 gap-2" : ""}`}
+                >
                   <div className="flex border-b border-gray-200 dark:border-gray-700">
                     <button
                       onClick={() => setActiveTab("pending")}
-                      className={`py-2 px-4 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
+                      className={`${isHandheld ? "py-1.5 px-3 handheld-py-1 handheld-px-2 handheld-text-xs" : "py-2 px-4"} text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
                         activeTab === "pending"
                           ? "bg-white dark:bg-boxdark border-b-2 border-primary text-primary"
                           : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                       }`}
                     >
-                      <Clipboard size={16} />
+                      <Clipboard size={isHandheld ? 14 : 16} />
                       Por Procesar
-                      <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700">
+                      <span
+                        className={`inline-flex items-center justify-center ${isHandheld ? "w-4 h-4 text-[10px]" : "w-5 h-5 text-xs"} font-medium rounded-full bg-gray-100 dark:bg-gray-700`}
+                      >
                         {conteoData.MATERIALES.length - procesados.length}
                       </span>
                     </button>
                     <button
                       onClick={() => setActiveTab("processed")}
-                      className={`py-2 px-4 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
+                      className={`${isHandheld ? "py-1.5 px-3 handheld-py-1 handheld-px-2 handheld-text-xs" : "py-2 px-4"} text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
                         activeTab === "processed"
                           ? "bg-white dark:bg-boxdark border-b-2 border-primary text-primary"
                           : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                       }`}
                     >
-                      <ClipboardCheck size={16} />
+                      <ClipboardCheck size={isHandheld ? 14 : 16} />
                       Procesados
-                      <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700">
+                      <span
+                        className={`inline-flex items-center justify-center ${isHandheld ? "w-4 h-4 text-[10px]" : "w-5 h-5 text-xs"} font-medium rounded-full bg-gray-100 dark:bg-gray-700`}
+                      >
                         {procesados.length}
                       </span>
                     </button>
                   </div>
 
-                  <div className="relative w-full sm:w-64">
+                  <div className={`relative ${isHandheld ? "w-full" : "w-full sm:w-64"}`}>
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <Search size={16} className="text-gray-500 dark:text-gray-400" />
+                      <Search size={isHandheld ? 14 : 16} className="text-gray-500 dark:text-gray-400" />
                     </div>
                     <input
                       type="text"
                       placeholder="Buscar material..."
-                      className="w-full rounded-md border border-gray-200 bg-transparent py-2 pl-10 pr-4 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/30 dark:text-white text-sm"
+                      className={`w-full rounded-md border border-gray-200 bg-transparent ${isHandheld ? "py-1.5 handheld-py-1 handheld-text-xs" : "py-2"} pl-10 pr-4 text-gray-800 outline-none transition focus:border-primary active:border-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/30 dark:text-white text-sm`}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -1775,46 +2038,60 @@ const ConteosScreen: React.FC = () => {
 
                 {/* Contenido de la pestaña activa - Mejorado */}
                 {activeTab === "pending" ? (
-                  <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
+                  <div
+                    className={`space-y-2 ${isHandheld ? "max-h-[50vh] handheld-max-h-60vh" : "max-h-[60vh]"} overflow-y-auto custom-scrollbar pr-1`}
+                  >
                     {filteredPendingMaterials.length === 0 ? (
                       <div
                         className="bg-gray-50 dark:bg-gray-800/30 rounded-lg p-8 text-center border border-gray-200 dark:border-gray-700 flex flex-col items-center
-                        justify-center"
+        justify-center"
                       >
-                        <Clipboard size={24} className="text-gray-400 mb-2" />
-                        <p className="text-gray-500 dark:text-gray-400">
+                        <Clipboard size={isHandheld ? 20 : 24} className="text-gray-400 mb-2" />
+                        <p
+                          className={`text-gray-500 dark:text-gray-400 ${isHandheld ? "text-xs handheld-text-xs" : ""}`}
+                        >
                           {searchTerm
                             ? "No se encontraron materiales con ese término"
                             : "No hay materiales pendientes por procesar"}
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div
+                        className={`grid grid-cols-1 ${isHandheld ? "md:grid-cols-1 handheld-grid-cols-1 gap-1 handheld-gap-1" : "md:grid-cols-2 gap-2"}`}
+                      >
                         {filteredPendingMaterials.map((material, index) => (
                           <div
                             key={material.MATNR}
-                            className="bg-white dark:bg-boxdark border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-md animate-slideInRight hover-card"
+                            className={`bg-white dark:bg-boxdark border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-md animate-slideInRight hover-card ${isHandheld ? "handheld-p-2" : ""}`}
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
-                            <div className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                            <div
+                              className={`${isHandheld ? "p-2 handheld-p-2" : "p-3"} flex flex-col sm:flex-row justify-between items-start sm:items-center`}
+                            >
                               <div className="flex items-start mb-3 sm:mb-0 gap-3">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary flex-shrink-0">
-                                  <Package size={16} />
+                                <div
+                                  className={`flex items-center justify-center ${isHandheld ? "w-6 h-6" : "w-8 h-8"} rounded-full bg-primary/10 text-primary flex-shrink-0`}
+                                >
+                                  <Package size={isHandheld ? 12 : 16} />
                                 </div>
                                 <div>
-                                  <p className="font-medium text-gray-800 dark:text-white flex items-center gap-1.5">
+                                  <p
+                                    className={`font-medium text-gray-800 dark:text-white flex items-center gap-1.5 ${isHandheld ? "text-xs handheld-text-xs" : ""}`}
+                                  >
                                     {material.MATNR}
                                   </p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                                  <p
+                                    className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} text-gray-600 dark:text-gray-400 line-clamp-1`}
+                                  >
                                     {material.MAKTX}
                                   </p>
                                 </div>
                               </div>
                               <button
                                 onClick={() => openConteoModal(material)}
-                                className="bg-primary hover:bg-primary/90 text-white py-1.5 px-3 rounded-md text-sm transition-colors flex items-center gap-1.5 w-full sm:w-auto justify-center sm:justify-start"
+                                className={`bg-primary hover:bg-primary/90 text-white ${isHandheld ? "py-1 px-2 handheld-py-1 handheld-px-2 text-xs handheld-text-xs" : "py-1.5 px-3 text-sm"} rounded-md transition-colors flex items-center gap-1.5 w-full sm:w-auto justify-center sm:justify-start`}
                               >
-                                <Plus size={14} />
+                                <Plus size={isHandheld ? 12 : 14} />
                                 Realizar Conteo
                               </button>
                             </div>
@@ -1824,70 +2101,94 @@ const ConteosScreen: React.FC = () => {
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
+                  <div
+                    className={`space-y-2 ${isHandheld ? "max-h-[50vh] handheld-max-h-60vh" : "max-h-[60vh]"} overflow-y-auto custom-scrollbar pr-1`}
+                  >
                     {filteredProcessedMaterials.length === 0 ? (
                       <div className="bg-gray-50 dark:bg-gray-800/30 rounded-lg p-8 text-center border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center">
-                        <ClipboardCheck size={24} className="text-gray-400 mb-2" />
-                        <p className="text-gray-500 dark:text-gray-400">
+                        <ClipboardCheck size={isHandheld ? 20 : 24} className="text-gray-400 mb-2" />
+                        <p
+                          className={`text-gray-500 dark:text-gray-400 ${isHandheld ? "text-xs handheld-text-xs" : ""}`}
+                        >
                           {searchTerm ? "No se encontraron materiales con ese término" : "No hay materiales procesados"}
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <div
+                        className={`grid grid-cols-1 ${isHandheld ? "md:grid-cols-1 handheld-grid-cols-1 gap-1 handheld-gap-1" : "md:grid-cols-2 gap-2"}`}
+                      >
                         {filteredProcessedMaterials.map((material, index) => (
                           <div
                             key={material.MATNR}
-                            className="bg-white dark:bg-boxdark border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden transition-all duration-300 hover:border-green-300 hover:shadow-md animate-slideInRight hover-card"
+                            className={`bg-white dark:bg-boxdark border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden transition-all duration-300 hover:border-green-300 hover:shadow-md animate-slideInRight hover-card ${isHandheld ? "handheld-p-2" : ""}`}
                             style={{ animationDelay: `${index * 50}ms` }}
                           >
-                            <div className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-2 border-green-500">
+                            <div
+                              className={`${isHandheld ? "p-2 handheld-p-2" : "p-3"} flex flex-col sm:flex-row justify-between items-start sm:items-center border-l-2 border-green-500`}
+                            >
                               <div className="flex items-start mb-3 sm:mb-0 gap-3">
-                                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex-shrink-0">
-                                  <Check size={16} />
+                                <div
+                                  className={`flex items-center justify-center ${isHandheld ? "w-6 h-6" : "w-8 h-8"} rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 flex-shrink-0`}
+                                >
+                                  <Check size={isHandheld ? 12 : 16} />
                                 </div>
                                 <div>
-                                  <p className="font-medium text-gray-800 dark:text-white flex items-center gap-1.5">
+                                  <p
+                                    className={`font-medium text-gray-800 dark:text-white flex items-center gap-1.5 ${isHandheld ? "text-xs handheld-text-xs" : ""}`}
+                                  >
                                     {material.MATNR}
                                   </p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                                  <p
+                                    className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} text-gray-600 dark:text-gray-400 line-clamp-1`}
+                                  >
                                     {material.MAKTX}
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                              <div
+                                className={`flex flex-wrap gap-2 w-full sm:w-auto ${isHandheld ? "mt-1 handheld-gap-1" : ""}`}
+                              >
                                 <button
                                   onClick={() => handleModifyMaterial(material)}
                                   disabled={
-                                    conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado"
+                                    conteoData?.estado === "procesado" ||
+                                    conteoData?.estado === "contabilizado" ||
+                                    !canModify
                                   }
-                                  className={`bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
-                                    conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado"
+                                  className={`bg-yellow-500 hover:bg-yellow-600 text-white ${isHandheld ? "px-2 py-0.5 text-[10px] handheld-text-xs" : "px-2 py-1 text-xs"} rounded transition-colors flex items-center gap-1 ${
+                                    conteoData?.estado === "procesado" ||
+                                    conteoData?.estado === "contabilizado" ||
+                                    !canModify
                                       ? "opacity-50 cursor-not-allowed"
                                       : ""
                                   }`}
                                 >
-                                  <Edit2 size={12} />
+                                  <Edit2 size={isHandheld ? 10 : 12} />
                                   Modificar
                                 </button>
                                 <button
                                   onClick={() => viewProcessedCases(material)}
-                                  className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition-colors flex items-center gap-1"
+                                  className={`bg-blue-500 hover:bg-blue-600 text-white ${isHandheld ? "px-2 py-0.5 text-[10px] handheld-text-xs" : "px-2 py-1 text-xs"} rounded transition-colors flex items-center gap-1`}
                                 >
-                                  <Eye size={12} />
+                                  <Eye size={isHandheld ? 10 : 12} />
                                   Ver Cases
                                 </button>
                                 <button
                                   onClick={() => deleteMaterialProcessing(material)}
                                   disabled={
-                                    conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado"
+                                    conteoData?.estado === "procesado" ||
+                                    conteoData?.estado === "contabilizado" ||
+                                    !canModify
                                   }
-                                  className={`bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition-colors flex items-center gap-1 ${
-                                    conteoData?.estado === "procesado" || conteoData?.estado === "contabilizado"
+                                  className={`bg-red-500 hover:bg-red-600 text-white ${isHandheld ? "px-2 py-0.5 text-[10px] handheld-text-xs" : "px-2 py-1 text-xs"} rounded transition-colors flex items-center gap-1 ${
+                                    conteoData?.estado === "procesado" ||
+                                    conteoData?.estado === "contabilizado" ||
+                                    !canModify
                                       ? "opacity-50 cursor-not-allowed"
                                       : ""
                                   }`}
                                 >
-                                  <Trash2 size={12} />
+                                  <Trash2 size={isHandheld ? 10 : 12} />
                                   Borrar
                                 </button>
                               </div>
@@ -1906,28 +2207,42 @@ const ConteosScreen: React.FC = () => {
 
       {/* Modal de Conteo - Rediseñado y Minimalista */}
       {isModalOpen && selectedMaterial && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-2 sm:p-4 pt-16 ml-0 lg:ml-72.5 touch-none">
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden ${isHandheld ? "p-1" : "p-2 sm:p-4"} pt-16 ml-0 lg:ml-72.5 touch-none`}
+        >
           <div
             className="fixed inset-0 bg-black/50 transition-opacity touch-none backdrop-blur-sm animate-fadeIn"
             onClick={closeModal}
             style={{ userSelect: "none" }}
           ></div>
 
-          <div className="relative w-full max-w-3xl bg-white dark:bg-boxdark rounded-lg shadow-lg transform transition-all mx-auto flex flex-col max-h-[90vh] z-[60] animate-scaleIn">
+          <div
+            className={`relative w-full ${isHandheld ? "max-w-full handheld-modal" : "max-w-3xl"} bg-white dark:bg-boxdark rounded-lg shadow-lg transform transition-all mx-auto flex flex-col max-h-[90vh] z-[60] animate-scaleIn`}
+          >
             {/* Header - Minimalista con iconos */}
-            <div className="sticky top-0 z-10 flex justify-between items-center px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-t-lg">
+            <div
+              className={`sticky top-0 z-10 flex justify-between items-center ${isHandheld ? "px-3 py-2 handheld-modal-header" : "px-4 sm:px-6 py-3"} border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-t-lg`}
+            >
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
-                  <Package size={18} />
+                <div
+                  className={`flex items-center justify-center ${isHandheld ? "w-8 h-8" : "w-10 h-10"} rounded-full bg-primary/10 text-primary`}
+                >
+                  <Package size={isHandheld ? 16 : 18} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-medium text-gray-800 dark:text-white flex items-center gap-2">
+                  <h2
+                    className={`${isHandheld ? "text-base handheld-text-base" : "text-lg"} font-medium text-gray-800 dark:text-white flex items-center gap-2`}
+                  >
                     <span>Registrar Conteo</span>
-                    <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+                    <span
+                      className={`${isHandheld ? "text-[10px] handheld-text-xs px-1.5 py-0.5" : "text-xs px-2 py-0.5"} bg-primary/10 text-primary rounded-full`}
+                    >
                       {conteoData?.IBLNR}
                     </span>
                   </h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[250px] sm:max-w-[400px]">
+                  <p
+                    className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} text-gray-500 dark:text-gray-400 truncate max-w-[250px] sm:max-w-[400px]`}
+                  >
                     {selectedMaterial.MATNR} - {selectedMaterial.MAKTX}
                   </p>
                 </div>
@@ -1937,82 +2252,103 @@ const ConteosScreen: React.FC = () => {
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 aria-label="Cerrar"
               >
-                <X size={18} />
+                <X size={isHandheld ? 16 : 18} />
               </button>
             </div>
 
             {/* Contenido con scroll - Minimalista */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-grow custom-scrollbar">
+            <div
+              className={`${isHandheld ? "p-3 handheld-modal-content" : "p-4 sm:p-6"} overflow-y-auto flex-grow custom-scrollbar`}
+            >
               {/* Tabs for Available and Processed Cases */}
               <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
                 <button
                   onClick={() => setActiveModalTab("available")}
-                  className={`py-2 px-4 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
+                  className={`${isHandheld ? "py-1.5 px-3 text-xs handheld-text-xs" : "py-2 px-4 text-sm"} font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
                     activeModalTab === "available"
                       ? "bg-white dark:bg-boxdark border-b-2 border-primary text-primary"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   }`}
                 >
-                  <Clipboard size={16} />
+                  <Clipboard size={isHandheld ? 14 : 16} />
                   Cases Disponibles
-                  <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700">
+                  <span
+                    className={`inline-flex items-center justify-center ${isHandheld ? "w-4 h-4 text-[10px]" : "w-5 h-5 text-xs"} font-medium rounded-full bg-gray-100 dark:bg-gray-700`}
+                  >
                     {conteoMaterial.casesPendientes.length}
                   </span>
                 </button>
                 <button
                   onClick={() => setActiveModalTab("processed")}
-                  className={`py-2 px-4 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
+                  className={`${isHandheld ? "py-1.5 px-3 text-xs handheld-text-xs" : "py-2 px-4 text-sm"} font-medium rounded-t-lg transition-colors flex items-center gap-2 ${
                     activeModalTab === "processed"
                       ? "bg-white dark:bg-boxdark border-b-2 border-primary text-primary"
                       : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   }`}
                 >
-                  <ClipboardCheck size={16} />
+                  <ClipboardCheck size={isHandheld ? 14 : 16} />
                   Cases Registrados
-                  <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700">
+                  <span
+                    className={`inline-flex items-center justify-center ${isHandheld ? "w-4 h-4 text-[10px]" : "w-5 h-5 text-xs"} font-medium rounded-full bg-gray-100 dark:bg-gray-700`}
+                  >
                     {conteoMaterial.casesRegistrados.length}
                   </span>
                 </button>
               </div>
 
               {/* Formulario de conteo - Enhanced form styling */}
-              <div className="mb-6 bg-gray-50 dark:bg-gray-800/30 p-5 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
-                <h3 className="text-base font-medium text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                  {editingCase ? <Edit2 size={16} /> : <Plus size={16} />}
+              <div
+                className={`mb-6 bg-gray-50 dark:bg-gray-800/30 ${isHandheld ? "p-3 handheld-p-2" : "p-5"} rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm`}
+              >
+                <h3
+                  className={`${isHandheld ? "text-sm handheld-text-sm" : "text-base"} font-medium text-gray-800 dark:text-white mb-4 flex items-center gap-2`}
+                >
+                  {editingCase ? <Edit2 size={isHandheld ? 14 : 16} /> : <Plus size={isHandheld ? 14 : 16} />}
                   {editingCase ? "Editar Case" : "Registrar Nuevo Case"}
                 </h3>
-                <form onSubmit={handleSubmitConteo(handleConteoSubmit)} className="mb-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <form
+                  onSubmit={handleSubmitConteo(handleConteoSubmit)}
+                  className={`mb-2 ${isHandheld ? "handheld-compact-form" : ""}`}
+                >
+                  <div
+                    className={`grid grid-cols-1 ${isHandheld ? "sm:grid-cols-1 gap-3 handheld-gap-1" : "sm:grid-cols-2 gap-4"} mb-4`}
+                  >
                     <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1">
-                        <MapPin size={14} />
+                      <label
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1`}
+                      >
+                        <MapPin size={isHandheld ? 12 : 14} />
                         Ubicación
                       </label>
                       <div className="relative">
                         <input
                           type="text"
-                          className={`w-full rounded-md border ${ubicacionError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-primary focus:ring-primary"} bg-white py-2 px-3 text-gray-800 outline-none transition focus:ring-1 disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white`}
+                          className={`w-full rounded-md border ${ubicacionError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-primary focus:ring-primary"} bg-white ${isHandheld ? "py-1.5 handheld-py-1 text-sm handheld-text-xs" : "py-2"} px-3 text-gray-800 outline-none transition focus:ring-1 disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white`}
                           placeholder="Ingrese ubicación"
                           {...registerWithRef("ubicacion", { required: "La ubicación es obligatoria" }, ubicacionRef)}
                           onKeyDown={handleUbicacionKeyDown}
                         />
                       </div>
                       {ubicacionError && (
-                        <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                          <AlertCircle size={12} />
+                        <p
+                          className={`mt-1 ${isHandheld ? "text-[10px] handheld-text-xs" : "text-xs"} text-red-500 flex items-center gap-1`}
+                        >
+                          <AlertCircle size={isHandheld ? 10 : 12} />
                           {ubicacionError}
                         </p>
                       )}
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1">
-                        <Package size={14} />
+                      <label
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1`}
+                      >
+                        <Package size={isHandheld ? 12 : 14} />
                         Case
                       </label>
                       <div className="relative">
                         <input
                           type="text"
-                          className={`w-full rounded-md border ${caseError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-primary focus:ring-primary"} bg-white py-2 px-3 text-gray-800 outline-none transition focus:ring-1 disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white`}
+                          className={`w-full rounded-md border ${caseError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-primary focus:ring-primary"} bg-white ${isHandheld ? "py-1.5 handheld-py-1 text-sm handheld-text-xs" : "py-2"} px-3 text-gray-800 outline-none transition focus:ring-1 disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white`}
                           placeholder="Ingrese case"
                           {...registerWithRef("case", { required: "El case es obligatorio" }, caseRef)}
                           onKeyDown={handleCaseKeyDown}
@@ -2020,8 +2356,10 @@ const ConteosScreen: React.FC = () => {
                         />
                       </div>
                       {caseError && (
-                        <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                          <AlertCircle size={12} />
+                        <p
+                          className={`mt-1 ${isHandheld ? "text-[10px] handheld-text-xs" : "text-xs"} text-red-500 flex items-center gap-1`}
+                        >
+                          <AlertCircle size={isHandheld ? 10 : 12} />
                           {caseError}
                         </p>
                       )}
@@ -2031,42 +2369,52 @@ const ConteosScreen: React.FC = () => {
                   {/* Mostrar error de combinación si existe */}
                   {combinationError && (
                     <div className="mb-4">
-                      <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-md border border-red-200 dark:border-red-800 flex items-start gap-2">
-                        <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs p-2" : "text-sm p-3"} text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800 flex items-start gap-2`}
+                      >
+                        <AlertCircle size={isHandheld ? 14 : 16} className="mt-0.5 flex-shrink-0" />
                         <span>{combinationError}</span>
                       </p>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div
+                    className={`grid grid-cols-1 ${isHandheld ? "sm:grid-cols-1 gap-3 handheld-gap-1" : "sm:grid-cols-2 gap-4"} mb-4`}
+                  >
                     <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1">
-                        <Filter size={14} />
+                      <label
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1`}
+                      >
+                        <Filter size={isHandheld ? 12 : 14} />
                         Cantidad
                       </label>
                       <div className="relative">
                         <input
                           type="text"
-                          className="w-full rounded-md border border-gray-300 bg-white py-2 px-3 text-gray-800 outline-none transition focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white"
+                          className={`w-full rounded-md border border-gray-300 bg-white ${isHandheld ? "py-1.5 handheld-py-1 text-sm handheld-text-xs" : "py-2"} px-3 text-gray-800 outline-none transition focus:border-primary focus:ring-1 focus:ring-primary disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white`}
                           placeholder="Ingrese cantidad"
                           {...registerWithRef("cantidad", { required: "La cantidad es obligatoria" }, cantidadRef)}
                         />
                       </div>
                       {errorsConteo.cantidad && (
-                        <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                          <AlertCircle size={12} />
+                        <p
+                          className={`mt-1 ${isHandheld ? "text-[10px] handheld-text-xs" : "text-xs"} text-red-500 flex items-center gap-1`}
+                        >
+                          <AlertCircle size={isHandheld ? 10 : 12} />
                           {errorsConteo.cantidad.message}
                         </p>
                       )}
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1">
-                        <AlertCircle size={14} />
+                      <label
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} font-medium text-gray-700 dark:text-white mb-3 flex items-center gap-1`}
+                      >
+                        <AlertCircle size={isHandheld ? 12 : 14} />
                         Excepción
                       </label>
                       <input
                         type="text"
-                        className="w-full rounded-md border border-gray-300 bg-gray-100 py-2 px-3 text-gray-800 outline-none transition disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        className={`w-full rounded-md border border-gray-300 bg-gray-100 ${isHandheld ? "py-1.5 handheld-py-1 text-sm handheld-text-xs" : "py-2"} px-3 text-gray-800 outline-none transition disabled:cursor-default disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white`}
                         placeholder="Código de excepción"
                         {...registerConteo("excepcion")}
                         defaultValue="00"
@@ -2075,22 +2423,22 @@ const ConteosScreen: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 mt-5">
+                  <div className={`flex gap-3 ${isHandheld ? "mt-3" : "mt-5"}`}>
                     {editingCase && (
                       <button
                         type="button"
                         onClick={handleCancelEdit}
-                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white py-2 px-4 rounded-md text-sm transition-colors flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-600 font-medium"
+                        className={`flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white ${isHandheld ? "py-1.5 handheld-py-1 text-xs handheld-text-xs" : "py-2"} px-4 rounded-md text-sm transition-colors flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-600 font-medium`}
                       >
-                        <X size={16} />
+                        <X size={isHandheld ? 14 : 16} />
                         Cancelar
                       </button>
                     )}
                     <button
                       type="submit"
-                      className={`${editingCase ? "flex-1" : "w-full"} ${editingCase ? "bg-yellow-500 hover:bg-yellow-600" : "bg-primary hover:bg-primary/90"} text-white py-2 px-4 rounded-md text-sm transition-colors flex items-center justify-center gap-2 font-medium`}
+                      className={`${editingCase ? "flex-1" : "w-full"} ${editingCase ? "bg-yellow-500 hover:bg-yellow-600" : "bg-primary hover:bg-primary/90"} text-white ${isHandheld ? "py-1.5 handheld-py-1 text-xs handheld-text-xs" : "py-2"} px-4 rounded-md text-sm transition-colors flex items-center justify-center gap-2 font-medium`}
                     >
-                      {editingCase ? <Edit2 size={16} /> : <Plus size={16} />}
+                      {editingCase ? <Edit2 size={isHandheld ? 14 : 16} /> : <Plus size={isHandheld ? 14 : 16} />}
                       {editingCase ? "Actualizar" : "Registrar"}
                     </button>
                   </div>
@@ -2100,26 +2448,34 @@ const ConteosScreen: React.FC = () => {
               {/* Display Cases Based on Active Tab */}
               {activeModalTab === "available" ? (
                 <div className="mb-6">
-                  <h3 className="text-base font-medium text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                    <Clipboard size={16} />
+                  <h3
+                    className={`${isHandheld ? "text-sm handheld-text-sm" : "text-base"} font-medium text-gray-800 dark:text-white mb-3 flex items-center gap-2`}
+                  >
+                    <Clipboard size={isHandheld ? 14 : 16} />
                     Cases Disponibles
                   </h3>
                   {conteoMaterial.casesPendientes.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[30vh] overflow-y-auto custom-scrollbar pr-1">
+                    <div
+                      className={`grid grid-cols-1 ${isHandheld ? "sm:grid-cols-1 gap-3 handheld-gap-1" : "sm:grid-cols-2 gap-2"} max-h-[30vh] overflow-y-auto custom-scrollbar pr-1`}
+                    >
                       {conteoMaterial.casesPendientes.map((caseItem, index) => (
                         <div
                           key={caseItem.case}
-                          className="bg-white dark:bg-boxdark border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm p-3 transition-all duration-300 hover:border-primary/30 hover-card animate-fadeIn"
+                          className={`bg-white dark:bg-boxdark border border-gray-100 dark:border-gray-700 rounded-lg shadow-sm p-3 transition-all duration-300 hover:border-primary/30 hover-card animate-fadeIn`}
                           style={{ animationDelay: `${index * 30}ms` }}
                         >
                           <div className="flex items-start justify-between">
                             <div>
-                              <p className="text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                                <Package size={14} className="text-primary" />
+                              <p
+                                className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5`}
+                              >
+                                <Package size={isHandheld ? 12 : 14} className="text-primary" />
                                 <span>Case: {caseItem.case}</span>
                               </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
-                                <MapPin size={12} />
+                              <p
+                                className={`${isHandheld ? "text-[10px] handheld-text-xs" : "text-xs"} text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1`}
+                              >
+                                <MapPin size={isHandheld ? 10 : 12} />
                                 <span>Ubicación: {caseItem.ubicacion}</span>
                               </p>
                             </div>
@@ -2134,20 +2490,28 @@ const ConteosScreen: React.FC = () => {
                     </div>
                   ) : (
                     <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center">
-                      <Clipboard size={24} className="text-gray-400 mb-2" />
-                      <p className="text-gray-500 dark:text-gray-400">No hay cases disponibles para este material</p>
+                      <Clipboard size={isHandheld ? 20 : 24} className="text-gray-400 mb-2" />
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} text-gray-500 dark:text-gray-400`}
+                      >
+                        No hay cases disponibles para este material
+                      </p>
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="mb-6">
-                  <h3 className="text-base font-medium text-gray-800 dark:text-white mb-3 flex items-center gap-2">
-                    <ClipboardCheck size={16} />
+                  <h3
+                    className={`${isHandheld ? "text-sm handheld-text-sm" : "text-base"} font-medium text-gray-800 dark:text-white mb-3 flex items-center gap-2`}
+                  >
+                    <ClipboardCheck size={isHandheld ? 14 : 16} />
                     Cases Registrados
                   </h3>
                   {conteoMaterial.casesRegistrados.length > 0 ? (
                     <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <table
+                        className={`min-w-full divide-y divide-gray-200 dark:divide-gray-700 ${isHandheld ? "handheld-compact-table" : ""}`}
+                      >
                         <thead className="bg-gray-50 dark:bg-gray-800">
                           <tr>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -2174,13 +2538,13 @@ const ConteosScreen: React.FC = () => {
                             >
                               <td className="px-3 py-2 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-800 dark:text-white">
                                 <div className="flex items-center gap-1.5">
-                                  <Package size={14} className="text-primary" />
+                                  <Package size={isHandheld ? 12 : 14} className="text-primary" />
                                   {caseItem.case}
                                 </div>
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                                 <div className="flex items-center gap-1.5">
-                                  <FileText size={14} className="text-gray-400" />
+                                  <FileText size={isHandheld ? 12 : 14} className="text-gray-400" />
                                   {caseItem.ubicacion}
                                 </div>
                               </td>
@@ -2217,8 +2581,12 @@ const ConteosScreen: React.FC = () => {
                     </div>
                   ) : (
                     <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center">
-                      <ClipboardCheck size={24} className="text-gray-400 mb-2" />
-                      <p className="text-gray-500 dark:text-gray-400">No hay cases registrados para este material</p>
+                      <ClipboardCheck size={isHandheld ? 20 : 24} className="text-gray-400 mb-2" />
+                      <p
+                        className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} text-gray-500 dark:text-gray-400`}
+                      >
+                        No hay cases registrados para este material
+                      </p>
                     </div>
                   )}
                 </div>
@@ -2226,18 +2594,20 @@ const ConteosScreen: React.FC = () => {
             </div>
 
             {/* Footer - Minimalista */}
-            <div className="sticky bottom-0 z-10 flex justify-between px-4 sm:px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-b-lg">
+            <div
+              className={`sticky bottom-0 z-10 flex justify-between ${isHandheld ? "px-3 py-2 handheld-modal-footer" : "px-4 sm:px-6 py-3"} border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-b-lg`}
+            >
               <button
                 onClick={closeModal}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white rounded-md transition-colors flex items-center gap-2 text-sm"
+                className={`px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white rounded-md transition-colors flex items-center gap-2 text-sm`}
               >
                 <ArrowLeft size={16} />
                 Volver
               </button>
               <button
                 onClick={handleSaveConteo}
-                disabled={isSaving || conteoMaterial.casesRegistrados.length === 0}
-                className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors flex items-center gap-2 font-medium disabled:opacity-70 disabled:cursor-not-allowed text-sm"
+                disabled={isSaving || conteoMaterial.casesRegistrados.length === 0 || !canModify}
+                className={`px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-md transition-colors flex items-center gap-2 font-medium disabled:opacity-70 disabled:cursor-not-allowed text-sm`}
               >
                 {isSaving ? (
                   <>
@@ -2258,23 +2628,37 @@ const ConteosScreen: React.FC = () => {
 
       {/* Modal para ver cases procesados - Rediseñado */}
       {isProcessedCasesModalOpen && viewingProcessedCases && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-2 sm:p-4 pt-16 ml-0 lg:ml-72.5 touch-none">
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden ${isHandheld ? "p-1" : "p-2 sm:p-4"} pt-16 ml-0 lg:ml-72.5 touch-none`}
+        >
           <div
             className="fixed inset-0 bg-black/50 transition-opacity touch-none backdrop-blur-sm animate-fadeIn"
             onClick={closeProcessedCasesModal}
             style={{ userSelect: "none" }}
           ></div>
 
-          <div className="relative w-full max-w-2xl bg-white dark:bg-boxdark rounded-lg shadow-lg transform transition-all mx-auto flex flex-col max-h-[90vh] z-[60] animate-scaleIn">
+          <div
+            className={`relative w-full ${isHandheld ? "max-w-full handheld-modal" : "max-w-2xl"} bg-white dark:bg-boxdark rounded-lg shadow-lg transform transition-all mx-auto flex flex-col max-h-[90vh] z-[60] animate-scaleIn`}
+          >
             {/* Header - Minimalista */}
-            <div className="sticky top-0 z-10 flex justify-between items-center px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-t-lg">
+            <div
+              className={`sticky top-0 z-10 flex justify-between items-center ${isHandheld ? "px-3 py-2 handheld-modal-header" : "px-4 sm:px-6 py-3"} border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-t-lg`}
+            >
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                  <ClipboardCheck size={18} />
+                <div
+                  className={`flex items-center justify-center ${isHandheld ? "w-8 h-8" : "w-10 h-10"} rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400`}
+                >
+                  <ClipboardCheck size={isHandheld ? 16 : 18} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-medium text-gray-800 dark:text-white">Cases Procesados</h2>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[250px] sm:max-w-[400px]">
+                  <h2
+                    className={`${isHandheld ? "text-base handheld-text-base" : "text-lg"} font-medium text-gray-800 dark:text-white`}
+                  >
+                    Cases Procesados
+                  </h2>
+                  <p
+                    className={`${isHandheld ? "text-xs handheld-text-xs" : "text-sm"} text-gray-500 dark:text-gray-400 truncate max-w-[250px] sm:max-w-[400px]`}
+                  >
                     {viewingProcessedCases.MATNR} - {viewingProcessedCases.MAKTX}
                   </p>
                 </div>
@@ -2284,18 +2668,22 @@ const ConteosScreen: React.FC = () => {
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 aria-label="Cerrar"
               >
-                <X size={18} />
+                <X size={isHandheld ? 16 : 18} />
               </button>
             </div>
 
             {/* Contenido con scroll - Minimalista */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-grow custom-scrollbar">
+            <div
+              className={`${isHandheld ? "p-3 handheld-modal-content" : "p-4 sm:p-6"} overflow-y-auto flex-grow custom-scrollbar`}
+            >
               {viewingProcessedCases &&
               materialCasesMap &&
               materialCasesMap[viewingProcessedCases.MATNR] &&
               materialCasesMap[viewingProcessedCases.MATNR].length > 0 ? (
                 <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <table
+                    className={`min-w-full divide-y divide-gray-200 dark:divide-gray-700 ${isHandheld ? "handheld-compact-table" : ""}`}
+                  >
                     <thead className="bg-gray-50 dark:bg-gray-800">
                       <tr>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -2321,13 +2709,13 @@ const ConteosScreen: React.FC = () => {
                         >
                           <td className="px-3 py-2 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-800 dark:text-white">
                             <div className="flex items-center gap-1.5">
-                              <Package size={14} className="text-primary" />
+                              <Package size={isHandheld ? 12 : 14} className="text-primary" />
                               {caseItem.case}
                             </div>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                             <div className="flex items-center gap-1.5">
-                              <FileText size={14} className="text-gray-400" />
+                              <FileText size={isHandheld ? 12 : 14} className="text-gray-400" />
                               {caseItem.ubicacion}
                             </div>
                           </td>
@@ -2359,22 +2747,23 @@ const ConteosScreen: React.FC = () => {
                 </div>
               ) : (
                 <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center">
-                  <ClipboardCheck size={24} className="text-gray-400 mb-2" />
-                  <p className="text-gray-500 dark:text-gray-400">No hay cases procesados para este material</p>
-                  <p className="text-xs text-gray-400 mt-2">Material ID: {viewingProcessedCases?.MATNR}</p>
-                  <p className="text-xs text-gray-400 mt-1">Estado del mapa: {JSON.stringify(!!materialCasesMap)}</p>
-                  <p className="text-xs text-gray-400 mt-1">Materiales procesados: {procesados.length}</p>
+                  <ClipboardCheck size={isHandheld ? 20 : 24} className="text-gray-400 mb-2" />
+                  <p className={`text-gray-500 dark:text-gray-400 ${isHandheld ? "text-xs handheld-text-xs" : ""}`}>
+                    No hay cases procesados para este material
+                  </p>
                 </div>
               )}
             </div>
 
             {/* Footer - Minimalista */}
-            <div className="sticky bottom-0 z-10 flex justify-end px-4 sm:px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-b-lg">
+            <div
+              className={`sticky bottom-0 z-10 flex justify-end ${isHandheld ? "px-3 py-2 handheld-modal-footer" : "px-4 sm:px-6 py-3"} border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-boxdark rounded-b-lg`}
+            >
               <button
                 onClick={closeProcessedCasesModal}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white rounded-md transition-colors font-medium text-sm flex items-center gap-2"
+                className={`${isHandheld ? "px-3 py-1.5 text-xs handheld-text-xs" : "px-4 py-2 text-sm"} bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white rounded-md transition-colors font-medium flex items-center gap-2`}
               >
-                <X size={16} />
+                <X size={isHandheld ? 14 : 16} />
                 Cerrar
               </button>
             </div>
@@ -2441,7 +2830,7 @@ const ConteosScreen: React.FC = () => {
               </button>
               <button
                 onClick={handleConfirmProcess}
-                disabled={isProcessing}
+                disabled={isProcessing || !canProcess}
                 className="flex-1 py-2.5 px-4 rounded-md text-sm transition-all modal-dark-button-confirm flex items-center justify-center gap-2"
               >
                 {isProcessing ? (

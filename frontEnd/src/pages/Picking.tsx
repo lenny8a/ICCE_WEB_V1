@@ -1,3 +1,5 @@
+"use client"
+
 import { useState, useRef, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import Breadcrumb from "../components/Breadcrumbs/Breadcrumb"
@@ -5,6 +7,8 @@ import ErrorMessage from "../components/ErrorMessage"
 import axios from "axios"
 import { useToast } from "../hooks/useToast"
 import ToastContainer from "../components/ToastContainer"
+import { useDeviceDetect } from "../hooks/use-device-detect"
+import { useAuth } from "../context/AuthContext"
 
 const Picking = () => {
   const initialState = {
@@ -170,6 +174,10 @@ const Picking = () => {
   const [selectedExcepcionCase, setSelectedExcepcionCase] = useState<CaseReserva | null>(null)
   const [selectedExcepcion, setSelectedExcepcion] = useState<ExcepcionData | null>(null)
 
+  // Agregar verificación de permisos
+  const { checkPermission } = useAuth()
+  const canModificar = checkPermission("/salida/picking", "modificar")
+
   const api_url = import.meta.env.VITE_API_URL
 
   // Función para eliminar ceros a la izquierda
@@ -321,7 +329,7 @@ const Picking = () => {
           const processedMaterial: MaterialReserva = {
             MATNR: material.MATNR || "",
             MAKTX: material.MAKTX || "",
-            MENGE: material.MENGE ? String(Number.parseInt(material.MENGE, 10) || 0) : "0",
+            MENGE: material.MENGE ? String(Number.parseFloat(material.MENGE) || 0) : "0",
             MEINS: material.MEINS || "",
             CASES: [],
           }
@@ -332,7 +340,7 @@ const Picking = () => {
               (caseItem: { CASE: any; UBICACION: any; CANTIDAD: string; WERKS?: string; LGORT?: string }) => ({
                 CASE: caseItem.CASE || "",
                 UBICACION: caseItem.UBICACION || "",
-                CANTIDAD: caseItem.CANTIDAD ? String(Number.parseInt(caseItem.CANTIDAD, 10) || 0) : "0",
+                CANTIDAD: caseItem.CANTIDAD ? String(Number.parseFloat(caseItem.CANTIDAD) || 0) : "0",
                 WERKS: caseItem.WERKS || "",
                 LGORT: caseItem.LGORT || "",
               }),
@@ -373,7 +381,7 @@ const Picking = () => {
 
       // Establecer los datos
       setReservaData(processedData)
- 
+
       // Verificar si la reserva ya ha sido procesada solo después de obtener los datos
       try {
         const pickingStatus = await axios.get(`${api_url}/salida/picking/${formData.reserva}`)
@@ -558,6 +566,12 @@ const Picking = () => {
   }
 
   const openMaterialModal = (material: MaterialReserva) => {
+    // Verificar permisos
+    if (!canModificar) {
+      error("No tiene permisos para modificar picking")
+      return
+    }
+
     // Verificar si el material tiene al menos un case con cantidad disponible
     const hasCasesAvailable = material.CASES.some((caseItem) => Number.parseInt(caseItem.CANTIDAD) > 0)
 
@@ -685,9 +699,9 @@ const Picking = () => {
   const handleQuantityRegister = () => {
     if (!selectedMaterial || !selectedCase) return
 
-    const quantity = Number.parseInt(quantityToRegister)
-    const remaining = Number.parseInt(remainingQuantity)
-    const caseQuantity = Number.parseInt(selectedCase.CANTIDAD)
+    const quantity = Number.parseFloat(quantityToRegister)
+    const remaining = Number.parseFloat(remainingQuantity)
+    const caseQuantity = Number.parseFloat(selectedCase.CANTIDAD)
 
     // Validar que la cantidad sea un número válido y positivo
     if (isNaN(quantity) || quantity <= 0) {
@@ -717,7 +731,7 @@ const Picking = () => {
     if (existingItemIndex !== -1) {
       // Si existe, actualizar la cantidad en lugar de agregar una nueva línea
       const existingItem = registeredItems[existingItemIndex]
-      const existingQuantity = Number.parseInt(existingItem.quantity)
+      const existingQuantity = Number.parseFloat(existingItem.quantity)
       const newQuantity = existingQuantity + quantity
 
       newRegisteredItems[existingItemIndex] = {
@@ -760,12 +774,6 @@ const Picking = () => {
     const newRemaining = (remaining - quantity).toString()
     setRemainingQuantity(newRemaining)
 
-    // Ya no expandimos automáticamente la sección de elementos registrados
-    // Eliminamos esta línea:
-    // if (registeredItems.length === 0) {
-    //   setIsModalItemsExpanded(true)
-    // }
-
     // Resetear para el siguiente escaneo
     setScannedCase("")
     setQuantityToRegister("")
@@ -789,15 +797,15 @@ const Picking = () => {
     if (!itemToDelete) return
 
     // Actualizar la cantidad restante del material
-    const currentRemaining = Number.parseInt(remainingQuantity)
-    const itemQuantity = Number.parseInt(itemToDelete.quantity)
+    const currentRemaining = Number.parseFloat(remainingQuantity)
+    const itemQuantity = Number.parseFloat(itemToDelete.quantity)
     const newRemaining = (currentRemaining + itemQuantity).toString()
     setRemainingQuantity(newRemaining)
 
     // Actualizar la cantidad disponible en el case
     const updatedCasesList = updatedCases.map((caseItem) => {
       if (caseItem.CASE === itemToDelete.case && caseItem.UBICACION === itemToDelete.location) {
-        const currentCaseQuantity = Number.parseInt(caseItem.CANTIDAD)
+        const currentCaseQuantity = Number.parseFloat(caseItem.CANTIDAD)
         return {
           ...caseItem,
           CANTIDAD: (currentCaseQuantity + itemQuantity).toString(),
@@ -820,6 +828,12 @@ const Picking = () => {
 
   // Agregar función para eliminar un elemento registrado en la pantalla principal
   const handleDeleteMainItem = (itemId: string) => {
+    // Verificar permisos
+    if (!canModificar) {
+      error("No tiene permisos para eliminar elementos")
+      return
+    }
+
     // Buscar el elemento a eliminar
     const itemToDelete = allRegisteredItems.find((item) => item.id === itemId)
 
@@ -832,14 +846,14 @@ const Picking = () => {
 
     // Actualizar la cantidad del material
     const material = reservaData.MATERIALES[materialIndex]
-    const currentQuantity = Number.parseInt(material.MENGE)
-    const itemQuantity = Number.parseInt(itemToDelete.quantity)
+    const currentQuantity = Number.parseFloat(material.MENGE)
+    const itemQuantity = Number.parseFloat(itemToDelete.quantity)
     const newQuantity = (currentQuantity + itemQuantity).toString()
 
     // Actualizar la cantidad disponible en el case correspondiente
     const updatedCases = material.CASES.map((caseItem) => {
       if (caseItem.CASE === itemToDelete.case && caseItem.UBICACION === itemToDelete.location) {
-        const currentCaseQuantity = Number.parseInt(caseItem.CANTIDAD)
+        const currentCaseQuantity = Number.parseFloat(caseItem.CANTIDAD)
         return {
           ...caseItem,
           CANTIDAD: (currentCaseQuantity + itemQuantity).toString(),
@@ -874,6 +888,12 @@ const Picking = () => {
 
   // Función para abrir el modal de edición
   const openEditModal = (item: RegisteredItem) => {
+    // Verificar permisos
+    if (!canModificar) {
+      error("No tiene permisos para modificar elementos")
+      return
+    }
+
     setItemToEdit(item)
     setEditQuantity(item.quantity)
     setIsEditModalOpen(true)
@@ -908,8 +928,8 @@ const Picking = () => {
     setEditError("")
     setIsEditing(true)
 
-    const newQuantity = Number.parseInt(editQuantity)
-    const oldQuantity = Number.parseInt(itemToEdit.quantity)
+    const newQuantity = Number.parseFloat(editQuantity)
+    const oldQuantity = Number.parseFloat(itemToEdit.quantity)
 
     // Validar que la cantidad sea un número válido y positivo
     if (isNaN(newQuantity)) {
@@ -959,7 +979,7 @@ const Picking = () => {
 
     // Si estamos aumentando la cantidad, verificar que haya suficientes unidades disponibles
     if (quantityDiff > 0) {
-      const availableQuantity = Number.parseInt(material.CASES[caseIndex].CANTIDAD)
+      const availableQuantity = Number.parseFloat(material.CASES[caseIndex].CANTIDAD)
 
       if (quantityDiff > availableQuantity) {
         setEditError(`No hay suficientes unidades disponibles. Máximo disponible: ${availableQuantity}`)
@@ -968,7 +988,7 @@ const Picking = () => {
       }
 
       // Verificar que la nueva cantidad no exceda la cantidad total solicitada del material
-      const totalMaterialQuantity = Number.parseInt(material.MENGE) + oldQuantity
+      const totalMaterialQuantity = Number.parseFloat(material.MENGE) + oldQuantity
 
       if (newQuantity > totalMaterialQuantity) {
         setEditError(`La cantidad no puede exceder la cantidad total solicitada (${totalMaterialQuantity})`)
@@ -991,12 +1011,12 @@ const Picking = () => {
       })
 
       // Actualizar la cantidad del material
-      const currentMaterialQuantity = Number.parseInt(material.MENGE)
+      const currentMaterialQuantity = Number.parseFloat(material.MENGE)
       const newMaterialQuantity = (currentMaterialQuantity - quantityDiff).toString()
 
       // Actualizar la cantidad disponible en el case
       const updatedCases = [...material.CASES]
-      const currentCaseQuantity = Number.parseInt(updatedCases[caseIndex].CANTIDAD)
+      const currentCaseQuantity = Number.parseFloat(updatedCases[caseIndex].CANTIDAD)
       updatedCases[caseIndex] = {
         ...updatedCases[caseIndex],
         CANTIDAD: (currentCaseQuantity - quantityDiff).toString(),
@@ -1051,6 +1071,11 @@ const Picking = () => {
   // Actualizar la función handleSave para incluir WERKS y LGORT
   async function handleSave() {
     try {
+      if (!canModificar) {
+        error("No tiene permisos para guardar cambios")
+        return
+      }
+
       if (!reservaData || !selectedMaterial) return
 
       setIsSaving(true)
@@ -1133,6 +1158,12 @@ const Picking = () => {
 
   // Función para abrir el modal de excepciones
   const openExcepcionModal = (caseItem: CaseReserva) => {
+    // Verificar permisos
+    if (!canModificar) {
+      error("No tiene permisos para asignar excepciones")
+      return
+    }
+
     setSelectedExcepcionCase(caseItem)
     setSelectedExcepcion(null)
     setIsExcepcionModalOpen(true)
@@ -1223,11 +1254,16 @@ const Picking = () => {
     }
   }
 
+  const { isMobile } = useDeviceDetect()
+  const isHandheld = isMobile && window.innerWidth <= 480 && window.innerHeight <= 800
+
   return (
     <>
       <Breadcrumb pageName="Picking" />
 
-      <div className="grid grid-cols-1 gap-4 transition-all duration-700 mt-4">
+      <div
+        className={`container mx-auto p-${isHandheld ? "2" : isMobile ? "3" : "4"} ${isHandheld ? "max-w-full text-sm" : isMobile ? "max-w-full" : "max-w-7xl"}`}
+      >
         {/* Formulario de búsqueda - Estandarizado con Reubica */}
         <div className="bg-white dark:bg-boxdark rounded-md shadow-md overflow-hidden border border-gray-100 dark:border-gray-700 transition-all duration-500 hover:shadow-lg animate-in slide-in-from-top-8">
           <div className="p-4">
@@ -1342,7 +1378,9 @@ const Picking = () => {
             <div className="bg-gradient-to-r from-primary/10 to-transparent p-1">
               <div className="bg-white dark:bg-boxdark p-5 sm:p-7 rounded-lg">
                 {/* Cabecera de la reserva con diseño mejorado */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4 sm:gap-0">
+                <div
+                  className={`flex ${isMobile ? "flex-col" : "flex-row"} justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4 sm:gap-0`}
+                >
                   <div className="flex items-center">
                     <div className="bg-primary/10 p-3 rounded-full mr-4 animate-in spin-in-3 duration-700">
                       <svg
@@ -1437,11 +1475,18 @@ const Picking = () => {
                   ) : (
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
                       <button
-                        onClick={handleProcessReserva}
+                        onClick={() => {
+                          if (!canModificar) {
+                            error("No tiene permisos para procesar documentos")
+                            return
+                          }
+                          handleProcessReserva()
+                        }}
                         disabled={
                           isProcessing ||
                           allRegisteredItems.length === 0 ||
-                          (isReservaProcessed && processedPickingData?.status === "completed")
+                          (isReservaProcessed && processedPickingData?.status === "completed") ||
+                          !canModificar
                         }
                         className="bg-success text-white px-5 py-3 rounded-lg text-sm w-full sm:w-auto flex items-center justify-center gap-2 hover:bg-success/90 transition-all duration-500 shadow-md hover:shadow-lg hover:translate-y-[-2px] font-medium animate-in fade-in slide-in-from-right-8 disabled:bg-gray-400 disabled:hover:shadow-md disabled:hover:translate-y-0"
                       >
@@ -1538,6 +1583,28 @@ const Picking = () => {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+                  {!canModificar && (
+                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-700 dark:text-blue-300 text-sm animate-in fade-in slide-in-from-top-5 duration-300">
+                      <div className="flex items-center gap-2">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <line x1="12" x2="12" y1="8" y2="12"></line>
+                          <line x1="12" x2="12.01" y1="16" y2="16"></line>
+                        </svg>
+                        Modo de solo visualización. No tiene permisos para modificar.
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1748,14 +1815,24 @@ const Picking = () => {
                       <table className="w-full table-auto">
                         <thead>
                           <tr className="bg-gray-100 dark:bg-gray-700 text-left">
-                            <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 rounded-tl-lg">
+                            <th
+                              className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300 rounded-tl-lg`}
+                            >
                               Material
                             </th>
-                            <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Descripción</th>
-                            <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-right">
+                            <th
+                              className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300`}
+                            >
+                              Descripción
+                            </th>
+                            <th
+                              className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300 text-right`}
+                            >
                               Cantidad
                             </th>
-                            <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-center rounded-tr-lg">
+                            <th
+                              className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300 text-center rounded-tr-lg`}
+                            >
                               Acción
                             </th>
                           </tr>
@@ -1769,20 +1846,28 @@ const Picking = () => {
                               } animate-slideInRight`}
                               style={{ animationDelay: `${index * 100}ms` }}
                             >
-                              <td className="py-2 px-3 text-gray-800 dark:text-gray-200 font-medium">
+                              <td
+                                className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200 font-medium`}
+                              >
                                 {material.MATNR}
                               </td>
-                              <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{material.MAKTX}</td>
-                              <td className="py-3 px-4 text-gray-800 dark:text-gray-200 text-right font-semibold">
+                              <td
+                                className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200`}
+                              >
+                                {material.MAKTX}
+                              </td>
+                              <td
+                                className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200 text-right font-semibold`}
+                              >
                                 {material.MENGE}{" "}
                                 <span className="text-xs text-gray-500 dark:text-gray-400">{material.MEINS}</span>
                               </td>
-                              <td className="py-3 px-4 text-center">
+                              <td className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-center`}>
                                 {material.CASES.some((caseItem) => Number.parseInt(caseItem.CANTIDAD) > 0) ? (
                                   <button
                                     onClick={() => openMaterialModal(material)}
-                                    className="bg-primary text-white px-3 py-2 rounded-lg text-sm hover:bg-primary/90 transition-all duration-500 shadow-sm hover:shadow-md hover:translate-y-[-2px] flex items-center justify-center gap-2 mx-auto"
-                                    disabled={processingComplete}
+                                    className={`bg-primary text-white px-${isMobile ? "2" : "3"} py-${isMobile ? "1" : "2"} rounded-lg text-sm hover:bg-primary/90 transition-all duration-500 shadow-sm hover:shadow-md hover:translate-y-[-2px] flex items-center justify-center gap-2 mx-auto`}
+                                    disabled={processingComplete || !canModificar}
                                   >
                                     <svg
                                       xmlns="http://www.w3.org/2000/svg"
@@ -1971,20 +2056,34 @@ const Picking = () => {
                               <table className="w-full table-auto animate-in fade-in duration-700">
                                 <thead>
                                   <tr className="bg-gray-100 dark:bg-gray-700 text-left">
-                                    <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
+                                    <th
+                                      className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300`}
+                                    >
                                       Material
                                     </th>
-                                    <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
+                                    <th
+                                      className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300`}
+                                    >
                                       Descripción
                                     </th>
-                                    <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">
+                                    <th
+                                      className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300`}
+                                    >
                                       Ubicación
                                     </th>
-                                    <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300">Case</th>
-                                    <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-right">
+                                    <th
+                                      className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300`}
+                                    >
+                                      Case
+                                    </th>
+                                    <th
+                                      className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300 text-right`}
+                                    >
                                       Cantidad
                                     </th>
-                                    <th className="py-3 px-4 font-semibold text-gray-700 dark:text-gray-300 text-center">
+                                    <th
+                                      className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} font-semibold text-gray-700 dark:text-gray-300 text-center`}
+                                    >
                                       Acciones
                                     </th>
                                   </tr>
@@ -1996,23 +2095,40 @@ const Picking = () => {
                                       className="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-300 animate-in fade-in-50 slide-in-from-bottom-10"
                                       style={{ animationDelay: `${index * 100}ms` }}
                                     >
-                                      <td className="py-2 px-3 text-gray-800 dark:text-gray-200 font-medium">
+                                      <td
+                                        className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200 font-medium`}
+                                      >
                                         {item.material}
                                       </td>
-                                      <td className="py-3 px-4 text-gray-800 dark:text-gray-200">
+                                      <td
+                                        className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200`}
+                                      >
                                         {item.materialDesc}
                                       </td>
-                                      <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{item.location}</td>
-                                      <td className="py-3 px-4 text-gray-800 dark:text-gray-200">{item.case}</td>
-                                      <td className="py-3 px-4 text-gray-800 dark:text-gray-200 text-right font-semibold">
+                                      <td
+                                        className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200`}
+                                      >
+                                        {item.location}
+                                      </td>
+                                      <td
+                                        className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200`}
+                                      >
+                                        {item.case}
+                                      </td>
+                                      <td
+                                        className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-gray-800 dark:text-gray-200 text-right font-semibold`}
+                                      >
                                         {item.quantity}
                                       </td>
-                                      <td className="py-3 px-4 text-center">
+                                      <td
+                                        className={`px-${isMobile ? "2" : "4"} py-${isMobile ? "1" : "2"} text-center`}
+                                      >
                                         <div className="flex justify-center gap-2">
                                           <button
                                             onClick={() => openEditModal(item)}
                                             className="bg-amber-400 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-secondary/90 transition-all duration-500 shadow-sm hover:shadow-md hover:translate-y-[-2px] flex items-center gap-1"
                                             title="Modificar"
+                                            disabled={!canModificar}
                                           >
                                             <svg
                                               xmlns="http://www.w3.org/2000/svg"
@@ -2033,6 +2149,7 @@ const Picking = () => {
                                             onClick={() => handleDeleteMainItem(item.id)}
                                             className="bg-danger text-white px-3 py-1.5 rounded-lg text-xs hover:bg-danger/90 transition-all duration-500 shadow-sm hover:shadow-md hover:translate-y-[-2px] flex items-center gap-1"
                                             title="Eliminar"
+                                            disabled={!canModificar}
                                           >
                                             <svg
                                               xmlns="http://www.w3.org/2000/svg"
@@ -2157,7 +2274,9 @@ const Picking = () => {
 
       {/* Modal de ubicaciones con inputs de escaneo - Centrado and responsivo */}
       {isModalOpen && selectedMaterial && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4 pt-16 ml-0 lg:ml-72.5 touch-none">
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4 pt-16 ml-0 lg:ml-72.5 touch-none`}
+        >
           <div
             className="fixed inset-0 bg-black bg-opacity-50 transition-opacity touch-none backdrop-blur-sm animate-fadeIn"
             onClick={closeModal}
@@ -2763,7 +2882,7 @@ const Picking = () => {
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={registeredItems.length === 0 || isSaving}
+                  disabled={registeredItems.length === 0 || isSaving || !canModificar}
                   className="px-5 py-2 bg-success text-white rounded-lg hover:bg-success/90 transition-all duration-300 shadow-sm hover:shadow-md disabled:bg-gray-400 disabled:hover:shadow-sm flex items-center gap-2"
                 >
                   {isSaving ? (
@@ -2958,7 +3077,7 @@ const Picking = () => {
                 <button
                   type="button"
                   onClick={handleSaveEdit}
-                  disabled={!editQuantity || isEditing}
+                  disabled={!editQuantity || isEditing || !canModificar}
                   className="px-5 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all duration-300 shadow-sm hover:shadow-md disabled:bg-gray-400 disabled:hover:shadow-sm flex items-center gap-2"
                 >
                   {isEditing ? (

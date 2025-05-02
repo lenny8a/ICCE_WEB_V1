@@ -9,6 +9,7 @@ import type { viewEmbalForm } from "../types"
 import { useToast } from "../hooks/useToast"
 import ToastContainer from "../components/ToastContainer"
 import { useMobile } from "../hooks/use-mobile"
+import { useAuth } from "../context/AuthContext"
 
 // Componente de diálogo de confirmación más compacto
 const ConfirmDialog = ({
@@ -169,6 +170,10 @@ const Reubica = () => {
   const [excepciones, setExcepciones] = useState<ExcepcionData[]>([])
   const [isLoadingExcepciones, setIsLoadingExcepciones] = useState(false)
 
+  const { checkPermission } = useAuth()
+  const canModificar = checkPermission("/entrada/reubicar", "modificar")
+  console.log("Accion Modificar", canModificar)
+
   const {
     register: registerForm1,
     handleSubmit: handleSubmitForm1,
@@ -292,6 +297,11 @@ const Reubica = () => {
 
   // Función para manejar el envío del formulario
   const handleFormSubmit = (formData: viewEmbalForm) => {
+    if (!canModificar) {
+      error("No tiene permisos para modificar ubicaciones")
+      return
+    }
+
     // Si la ubicación está vacía, mostrar diálogo de confirmación
     if (!formData.zubic || formData.zubic.trim() === "") {
       setPendingFormData(formData)
@@ -304,6 +314,11 @@ const Reubica = () => {
   }
 
   async function handleReubica(formData: viewEmbalForm) {
+    if (!canModificar) {
+      error("No tiene permisos para modificar ubicaciones")
+      return
+    }
+
     try {
       setIsLoading(true)
 
@@ -365,6 +380,11 @@ const Reubica = () => {
   }
 
   async function handleExcepcion(excepcion: ExcepcionData) {
+    if (!canModificar) {
+      error("No tiene permisos para asignar excepciones")
+      return
+    }
+
     try {
       setIsLoading(true)
 
@@ -662,6 +682,39 @@ const Reubica = () => {
                       </div>
                     </div>
                   </div>
+                  {!canModificar && (
+                    <div className="mb-4.5 rounded-md bg-warning-500 bg-opacity-10 p-4">
+                      <div className="flex items-center">
+                        <span className="mr-2 rounded-md bg-warning-500 p-1.5 text-white">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M8 1.5V10.5"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d="M8 13.5V14.5"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </span>
+                        <p className="font-medium text-warning-500">
+                          No tiene permisos para modificar ubicaciones o asignar excepciones.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Campo de ubicación destino - Versión móvil optimizada para 480x800 */}
                   <div className={`${isSmallScreen ? "mb-2" : "mb-3"}`}>
@@ -683,90 +736,104 @@ const Reubica = () => {
                         const input = e.target as HTMLInputElement
                         input.value = input.value.toUpperCase()
                       }}
-                      disabled={isLoading}
+                      disabled={isLoading || !canModificar}
                     />
                     {errorsForm2.zubic && <ErrorMessage>{errorsForm2.zubic.message}</ErrorMessage>}
                   </div>
 
                   {/* Botones de acción - Versión móvil optimizada para 480x800 */}
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="submit"
-                      className={`flex items-center justify-center gap-1 rounded-md bg-primary ${isSmallScreen ? "px-2 py-2.5 text-xs" : "px-3 py-3 text-sm"} font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md disabled:bg-opacity-70`}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <>
-                          <svg
-                            className={`${isSmallScreen ? "h-3.5 w-3.5" : "h-4 w-4"} animate-spin`}
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                          <span>{isSmallScreen ? "Procesando" : "Procesando..."}</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width={isSmallScreen ? "16" : "18"}
-                            height={isSmallScreen ? "16" : "18"}
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                            <polyline points="7 3 7 8 15 8"></polyline>
-                          </svg>
-                          <span>Guardar</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className={`flex items-center justify-center gap-1 rounded-md bg-danger ${isSmallScreen ? "px-2 py-2.5 text-xs" : "px-3 py-3 text-sm"} font-medium text-white shadow-sm transition-all duration-300 hover:bg-danger/90 hover:shadow-md`}
-                      onClick={(e) => {
-                        e.preventDefault()
-                        setIsModalOpen(true)
-                      }}
-                      disabled={isLoading}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width={isSmallScreen ? "16" : "18"}
-                        height={isSmallScreen ? "16" : "18"}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                  {canModificar ? (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="submit"
+                        className={`flex items-center justify-center gap-1 rounded-md bg-primary ${isSmallScreen ? "px-2 py-2.5 text-xs" : "px-3 py-3 text-sm"} font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md disabled:bg-opacity-70`}
+                        disabled={isLoading || !canModificar}
                       >
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                        <line x1="12" y1="9" x2="12" y2="13"></line>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                      </svg>
-                      <span>Excepción</span>
-                    </button>
-                  </div>
+                        {isLoading ? (
+                          <>
+                            <svg
+                              className={`${isSmallScreen ? "h-3.5 w-3.5" : "h-4 w-4"} animate-spin`}
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            <span>{isSmallScreen ? "Procesando" : "Procesando..."}</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width={isSmallScreen ? "16" : "18"}
+                              height={isSmallScreen ? "16" : "18"}
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                              <polyline points="7 3 7 8 15 8"></polyline>
+                            </svg>
+                            <span>Guardar</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex items-center justify-center gap-1 rounded-md bg-danger ${isSmallScreen ? "px-2 py-2.5 text-xs" : "px-3 py-3 text-sm"} font-medium text-white shadow-sm transition-all duration-300 hover:bg-danger/90 hover:shadow-md`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          if (!canModificar) {
+                            error("No tiene permisos para asignar excepciones")
+                            return
+                          }
+                          setIsModalOpen(true)
+                        }}
+                        disabled={isLoading || !canModificar}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width={isSmallScreen ? "16" : "18"}
+                          height={isSmallScreen ? "16" : "18"}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                          <line x1="12" y1="9" x2="12" y2="13"></line>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <span>Excepción</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-4 flex justify-center">
+                      <div className="rounded-md bg-gray-100 dark:bg-gray-800 px-4 py-3 text-center">
+                        <p className={`${isSmallScreen ? "text-xs" : "text-sm"} text-gray-600 dark:text-gray-400`}>
+                          Modo de solo visualización. No tiene permisos para modificar.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </form>
               </div>
             </div>
@@ -930,7 +997,7 @@ const Reubica = () => {
                               type="button"
                               className={`flex-shrink-0 whitespace-nowrap rounded-md bg-primary ${isSmallScreen ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-xs"} text-white transition-all duration-300 hover:bg-primary/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
                               onClick={() => handleExcepcion(excepcion)}
-                              disabled={isLoading}
+                              disabled={isLoading || !canModificar}
                             >
                               {isLoading ? (
                                 <span className="flex items-center">
@@ -1174,7 +1241,7 @@ const Reubica = () => {
 
                     <div>
                       <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Descripción:</p>
-                      <p className="text-sm text-gray-800 dark:text-white truncate">{count.MAKTX}</p>
+                      <p className="text-sm text-gray-800 dark:text-white">{count.MAKTX}</p>
                     </div>
 
                     <div>
@@ -1199,6 +1266,33 @@ const Reubica = () => {
                     </div>
                   </div>
                 </div>
+                {!canModificar && (
+                  <div className="mb-4.5 rounded-md bg-warning-500 bg-opacity-10 p-4">
+                    <div className="flex items-center">
+                      <span className="mr-2 rounded-md bg-warning-500 p-1.5 text-white">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path
+                            d="M8 1.5V10.5"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M8 13.5V14.5"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                      <p className="font-medium text-warning-500">
+                        No tiene permisos para modificar ubicaciones o asignar excepciones.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Campo de ubicación destino */}
                 <div className="mb-4">
@@ -1236,88 +1330,102 @@ const Reubica = () => {
                         const input = e.target as HTMLInputElement
                         input.value = input.value.toUpperCase()
                       }}
-                      disabled={isLoading}
+                      disabled={isLoading || !canModificar}
                     />
                   </div>
                   {errorsForm2.zubic && <ErrorMessage>{errorsForm2.zubic.message}</ErrorMessage>}
                 </div>
 
                 {/* Botones de acción */}
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-xs font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md disabled:bg-opacity-70 border border-primary"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <svg
-                        className="h-4 w-4 animate-spin"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                    ) : (
-                      <>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                          <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                          <polyline points="7 3 7 8 15 8"></polyline>
-                        </svg>
-                        <span>Guardar</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-1 rounded-md bg-danger px-3 py-2 text-xs font-medium text-white shadow-sm transition-all duration-300 hover:bg-danger/90 hover:shadow-md"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      setIsModalOpen(true)
-                    }}
-                    disabled={isLoading}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                {canModificar ? (
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-2 text-xs font-medium text-white shadow-sm transition-all duration-300 hover:bg-primary/90 hover:shadow-md disabled:bg-opacity-70 border border-primary"
+                      disabled={isLoading || !canModificar}
                     >
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                      <line x1="12" y1="9" x2="12" y2="13"></line>
-                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                    <span>Excepción</span>
-                  </button>
-                </div>
+                      {isLoading ? (
+                        <svg
+                          className="h-4 w-4 animate-spin"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                      ) : (
+                        <>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                          </svg>
+                          <span>Guardar</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center justify-center gap-1 rounded-md bg-danger px-3 py-2 text-xs font-medium text-white shadow-sm transition-all duration-300 hover:bg-danger/90 hover:shadow-md"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        if (!canModificar) {
+                          error("No tiene permisos para asignar excepciones")
+                          return
+                        }
+                        setIsModalOpen(true)
+                      }}
+                      disabled={isLoading || !canModificar}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </svg>
+                      <span>Excepción</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex justify-center">
+                    <div className="rounded-md bg-gray-100 dark:bg-gray-800 px-4 py-3 text-center">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Modo de solo visualización. No tiene permisos para modificar.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
           </div>
@@ -1428,7 +1536,7 @@ const Reubica = () => {
                             type="button"
                             className="flex-shrink-0 whitespace-nowrap rounded-md bg-primary px-2 py-1 text-xs text-white transition-all duration-300 hover:bg-primary/90 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             onClick={() => handleExcepcion(excepcion)}
-                            disabled={isLoading}
+                            disabled={isLoading || !canModificar}
                           >
                             {isLoading ? (
                               <span className="flex items-center">
