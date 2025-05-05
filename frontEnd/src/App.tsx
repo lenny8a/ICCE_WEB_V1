@@ -9,19 +9,19 @@ import VisEmbal from "./pages/consulEmbal"
 import ECommerce from "./pages/Dashboard/ECommerce"
 import DefaultLayout from "./layout/DefaultLayout"
 import Reubica from "./pages/Reubica"
-import Picking from "./pages/Picking"
+//import Picking from "./pages/Picking"
 import PickingHistory from "./pages/Picking-history"
 import MantenimientoExcepciones from "./pages/Mantennimientos/mantExcepciones"
 import Conteos from "./pages/Conteos"
 import MantenimientoExcepcionesCase from "./pages/CaseExcepciones"
 import UserManagement from "./pages/Authentication/UserManagement"
 import RoleManagement from "./pages/Authentication/RoleManagement"
-import { initializeSidebar } from "./components/Utils/sidebar-init"
 import { AuthProvider } from "./context/AuthContext"
 import ProtectedRoute from "./components/ProtectedRoute"
 import ConteoHistory from "./pages/conteo-history"
 import AccessDenied from "./pages/AccessDenied"
 import UserProfile from "./pages/UserProfile"
+import PickingRouter from "./pages/picking-router"
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true)
@@ -34,9 +34,6 @@ function App() {
   useEffect(() => {
     setTimeout(() => setLoading(false), 1000)
 
-    // Inicializar el sidebar después de que la aplicación haya cargado
-    const cleanup = initializeSidebar()
-    return cleanup
   }, [])
 
   return (
@@ -87,7 +84,7 @@ function App() {
               <ProtectedRoute requiredPermission={{ pagePath: "/salida/picking", action: "visualizar" }}>
                 <DefaultLayout>
                   <PageTitle title="Salida | Picking" />
-                  <Picking />
+                  <PickingRouter />
                 </DefaultLayout>
               </ProtectedRoute>
             }

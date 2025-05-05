@@ -1,5 +1,7 @@
+"use client"
+
 import React, { useEffect, useRef, useState } from "react"
-import { NavLink, useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import SidebarLinkGroup from "./SidebarLinkGroup"
 import Logo from "../../images/logo/ICCE_LogoOriginal.svg"
 
@@ -27,73 +29,57 @@ import {
 
 interface SidebarProps {
   sidebarOpen: boolean
-  setSidebarOpen: (arg: boolean) => void
+  setSidebarOpen: (open: boolean) => void
 }
 
-const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
-  const location = useLocation()
-  const { pathname } = location
-
+const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
+  const { pathname } = useLocation()
   const trigger = useRef<HTMLButtonElement>(null)
   const sidebar = useRef<HTMLElement>(null)
+  const stored = localStorage.getItem("sidebar-expanded")
+  const [sidebarExpanded, setSidebarExpanded] = useState(stored === "true")
+  const navigate = useNavigate()
+  // Overlay en móvil
+  const isMobile = window.innerWidth < 1024
 
-  const storedSidebarExpanded = localStorage.getItem("sidebar-expanded")
-  const [sidebarExpanded, setSidebarExpanded] = useState(
-    storedSidebarExpanded === null ? false : storedSidebarExpanded === "true",
-  )
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024)
-
+  // Click fuera (fase capture)
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024)
-    }
-
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
-
-  // Close on click outside
-  useEffect(() => {
-    const clickHandler = ({ target }: MouseEvent) => {
-      if (!sidebar.current || !trigger.current) return
-      if (!sidebarOpen || sidebar.current.contains(target as Node) || trigger.current.contains(target as Node)) return
+    const handler = (e: MouseEvent) => {
+      if (!sidebarOpen) return
+      const t = e.target as Node
+      if (sidebar.current?.contains(t) || trigger.current?.contains(t)) return
       setSidebarOpen(false)
     }
-    document.addEventListener("click", clickHandler)
-    return () => document.removeEventListener("click", clickHandler)
-  })
+    document.addEventListener("mousedown", handler, true)
+    return () => document.removeEventListener("mousedown", handler, true)
+  }, [sidebarOpen, setSidebarOpen])
 
-  // Close if the esc key is pressed
+  // Cerrar con Esc
   useEffect(() => {
-    const keyHandler = ({ keyCode }: KeyboardEvent) => {
-      if (!sidebarOpen || keyCode !== 27) return
-      setSidebarOpen(false)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && sidebarOpen) setSidebarOpen(false)
     }
-    document.addEventListener("keydown", keyHandler)
-    return () => document.removeEventListener("keydown", keyHandler)
-  })
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [sidebarOpen, setSidebarOpen])
 
-  // Update localStorage and body class when sidebarExpanded changes
+  // Persistir expandido
   useEffect(() => {
     localStorage.setItem("sidebar-expanded", sidebarExpanded.toString())
-    const body = document.querySelector("body")
-    if (body) {
-      if (sidebarExpanded) {
-        body.classList.add("sidebar-expanded")
-      } else {
-        body.classList.remove("sidebar-expanded")
-      }
-    }
+    document.body.classList.toggle("sidebar-expanded", sidebarExpanded)
   }, [sidebarExpanded])
 
-  // Log cuando cambia el estado del sidebar
-  useEffect(() => {
-    console.log("Sidebar open state:", sidebarOpen)
-  }, [sidebarOpen])
+ // Función para manejar la navegación
+ const handleNavigation = (path: string) => {
+  // En dispositivos móviles, cerrar el sidebar
+  if (isMobile) {
+    setSidebarOpen(false)
+  }
+  navigate(path)
+}
 
   return (
     <>
-      {/* Overlay para dispositivos móviles */}
       {isMobile && sidebarOpen && (
         <div
           className="fixed inset-0 z-[998] bg-black bg-opacity-50 lg:hidden"
@@ -109,9 +95,9 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       >
         {/* SIDEBAR HEADER */}
         <div className="flex items-center justify-between gap-2 px-6 py-5 lg:py-6">
-          <NavLink to="/" className="flex items-center">
+          <div className="flex items-center cursor-pointer">
             <img src={Logo || "/placeholder.svg"} alt="ICCE Logo" className="h-19 block" />
-          </NavLink>
+          </div>
 
           <button
             ref={trigger}
@@ -136,16 +122,15 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               <ul className="mb-6 flex flex-col gap-1.5">
                 {/* Menu Item Dashboard */}
                 <li>
-                  <NavLink
-                    to="/"
-                    className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                  <div
+                    className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 cursor-pointer ${
                       pathname === "/" && "bg-graydark dark:bg-meta-4"
                     }`}
-                    onClick={() => isMobile && setSidebarOpen(false)}
+                    onClick={() => handleNavigation("/")}
                   >
                     <LayoutDashboard size={18} />
                     Dashboard
-                  </NavLink>
+                  </div>
                 </li>
 
                 {/* Menu Item Procesos de Entrada */}
@@ -153,9 +138,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   {(handleClick, open) => {
                     return (
                       <React.Fragment>
-                        <NavLink
-                          to="#"
-                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                        <div
+                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 cursor-pointer ${
                             (pathname === "/entrada" || pathname.includes("entrada")) && "bg-graydark dark:bg-meta-4"
                           }`}
                           onClick={(e) => {
@@ -169,35 +153,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                             className={`absolute right-4 top-1/2 -translate-y-1/2 fill-current ${open && "rotate-180"}`}
                             size={18}
                           />
-                        </NavLink>
+                        </div>
                         {/* Dropdown Menu Start */}
                         <div className={`translate transform overflow-hidden ${!open && "hidden"}`}>
                           <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
                             <li>
-                              <NavLink
-                                to="/entrada/visualizar"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/entrada/visualizar" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/entrada/visualizar")}
                               >
                                 <Eye size={16} className="opacity-50" />
                                 Visualizar case
-                              </NavLink>
+                              </div>
                             </li>
                             <li>
-                              <NavLink
-                                to="/entrada/reubicar"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/entrada/reubicar" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/entrada/reubicar")}
                               >
                                 <MapPin size={16} className="opacity-50" />
                                 Ubicar case
-                              </NavLink>
+                              </div>
                             </li>
                           </ul>
                         </div>
@@ -212,9 +192,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   {(handleClick, open) => {
                     return (
                       <React.Fragment>
-                        <NavLink
-                          to="#"
-                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                        <div
+                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 cursor-pointer ${
                             (pathname === "/salida" || pathname.includes("salida")) && "bg-graydark dark:bg-meta-4"
                           }`}
                           onClick={(e) => {
@@ -228,35 +207,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                             className={`absolute right-4 top-1/2 -translate-y-1/2 fill-current ${open && "rotate-180"}`}
                             size={18}
                           />
-                        </NavLink>
+                        </div>
                         {/* Dropdown Menu Start */}
                         <div className={`translate transform overflow-hidden ${!open && "hidden"}`}>
                           <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
                             <li>
-                              <NavLink
-                                to="/salida/picking"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/salida/picking" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/salida/picking")}
                               >
                                 <ShoppingCart size={16} className="opacity-50" />
                                 Picking
-                              </NavLink>
+                              </div>
                             </li>
                             <li>
-                              <NavLink
-                                to="/salida/sal_merca"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/salida/sal_merca" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/salida/sal_merca")}
                               >
                                 <Truck size={16} className="opacity-50" />
                                 Salida de Mercancias
-                              </NavLink>
+                              </div>
                             </li>
                           </ul>
                         </div>
@@ -271,9 +246,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   {(handleClick, open) => {
                     return (
                       <React.Fragment>
-                        <NavLink
-                          to="#"
-                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                        <div
+                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 cursor-pointer ${
                             (pathname === "/cont" || pathname.includes("cont")) && "bg-graydark dark:bg-meta-4"
                           }`}
                           onClick={(e) => {
@@ -287,35 +261,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                             className={`absolute right-4 top-1/2 -translate-y-1/2 fill-current ${open && "rotate-180"}`}
                             size={18}
                           />
-                        </NavLink>
+                        </div>
                         {/* Dropdown Menu Start */}
                         <div className={`translate transform overflow-hidden ${!open && "hidden"}`}>
                           <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
                             <li>
-                              <NavLink
-                                to="/cont/conteos"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/cont/conteos" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/cont/conteos")}
                               >
                                 <FileSpreadsheet size={16} className="opacity-50" />
                                 Conteos
-                              </NavLink>
+                              </div>
                             </li>
                             <li>
-                              <NavLink
-                                to="/conteo-proceso"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/conteo-proceso" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/conteo-proceso")}
                               >
                                 <Clock size={16} className="opacity-50" />
                                 Historial de conteos
-                              </NavLink>
+                              </div>
                             </li>
                           </ul>
                         </div>
@@ -330,9 +300,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   {(handleClick, open) => {
                     return (
                       <React.Fragment>
-                        <NavLink
-                          to="#"
-                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                        <div
+                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 cursor-pointer ${
                             (pathname === "/mant" || pathname.includes("mant")) && "bg-graydark dark:bg-meta-4"
                           }`}
                           onClick={(e) => {
@@ -346,35 +315,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                             className={`absolute right-4 top-1/2 -translate-y-1/2 fill-current ${open && "rotate-180"}`}
                             size={18}
                           />
-                        </NavLink>
+                        </div>
                         {/* Dropdown Menu Start */}
                         <div className={`translate transform overflow-hidden ${!open && "hidden"}`}>
                           <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
                             <li>
-                              <NavLink
-                                to="/mant/excepciones"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/mant/excepciones" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/mant/excepciones")}
                               >
                                 <AlertTriangle size={16} className="opacity-50" />
                                 Excepciones
-                              </NavLink>
+                              </div>
                             </li>
                             <li>
-                              <NavLink
-                                to="/mant/case"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/mant/case" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/mant/case")}
                               >
                                 <CheckSquare size={16} className="opacity-50" />
                                 Case excepciones
-                              </NavLink>
+                              </div>
                             </li>
                           </ul>
                         </div>
@@ -389,9 +354,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                   {(handleClick, open) => {
                     return (
                       <React.Fragment>
-                        <NavLink
-                          to="#"
-                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 ${
+                        <div
+                          className={`group relative flex items-center gap-2.5 rounded-sm py-2 px-4 font-medium text-bodydark1 duration-300 ease-in-out hover:bg-graydark dark:hover:bg-meta-4 cursor-pointer ${
                             (pathname === "/auth" || pathname.includes("auth")) && "bg-graydark dark:bg-meta-4"
                           }`}
                           onClick={(e) => {
@@ -405,48 +369,42 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                             className={`absolute right-4 top-1/2 -translate-y-1/2 fill-current ${open && "rotate-180"}`}
                             size={18}
                           />
-                        </NavLink>
+                        </div>
                         {/* Dropdown Menu Start */}
                         <div className={`translate transform overflow-hidden ${!open && "hidden"}`}>
                           <ul className="mt-4 mb-5.5 flex flex-col gap-2.5 pl-6">
                             <li>
-                              <NavLink
-                                to="/auth/signup"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/auth/signup" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/auth/signup")}
                               >
                                 <User size={16} className="opacity-50" />
                                 Crear usuario
-                              </NavLink>
+                              </div>
                             </li>
                             <li>
-                              <NavLink
-                                to="/admin/users"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/admin/users" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/admin/users")}
                               >
                                 <Users size={16} className="opacity-50" />
                                 Gestión de Usuarios
-                              </NavLink>
+                              </div>
                             </li>
                             <li>
-                              <NavLink
-                                to="/admin/roles"
-                                className={({ isActive }) =>
-                                  "group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white " +
-                                  (isActive && "!text-white")
-                                }
-                                onClick={() => isMobile && setSidebarOpen(false)}
+                              <div
+                                className={`group relative flex items-center gap-2.5 rounded-md px-4 font-medium text-bodydark2 duration-300 ease-in-out hover:text-white cursor-pointer ${
+                                  pathname === "/admin/roles" && "!text-white"
+                                }`}
+                                onClick={() => handleNavigation("/admin/roles")}
                               >
                                 <Settings size={16} className="opacity-50" />
                                 Gestión de Roles
-                              </NavLink>
+                              </div>
                             </li>
                           </ul>
                         </div>
