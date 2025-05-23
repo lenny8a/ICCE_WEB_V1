@@ -1,11 +1,9 @@
-import type React from "react"
-
 import { useState, useMemo } from "react"
 import { useAuth } from "../context/AuthContext"
 import Breadcrumb from "../components/Breadcrumbs/Breadcrumb"
-import { useToast } from "../hooks/useToast"
+import toast from 'react-hot-toast'
+import axios from 'axios' // Importar axios
 import { User, Shield, Edit3, Save, X, Mail, Phone, MapPin, Lock, Eye, EyeOff, LogOut } from "lucide-react"
-import ToastContainer from "../components/ToastContainer"
 
 const getInitials = (name: string, lastName: string) => {
   if (!name && !lastName) return "U";
@@ -13,10 +11,10 @@ const getInitials = (name: string, lastName: string) => {
 };
 
 const UserProfile = () => {
-  const { user, logout } = useAuth()
-  const { toasts, removeToast, success, error } = useToast()
+  const { user, logout, refreshUserData } = useAuth() // Cambiado loadUserData por refreshUserData
   const [activeTab, setActiveTab] = useState("personal")
   const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState(false); // Estado de carga
   const [showPassword, setShowPassword] = useState(false)
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -49,69 +47,94 @@ const UserProfile = () => {
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setTimeout(() => {
-      success("Perfil actualizado correctamente")
-      setIsEditing(false)
-    }, 800)
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token || !user?._id) {
+        toast.error("No está autorizado para esta acción.");
+        setLoading(false);
+        return;
+      }
+
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_URL}/user/${user._id}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data.success) {
+        toast.success("Perfil actualizado correctamente");
+        await refreshUserData(); // Llama a refreshUserData
+        setIsEditing(false);
+      } else {
+        toast.error(response.data.message || "Error al actualizar el perfil");
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error de red al actualizar el perfil");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Intentando actualizar contraseña"); // Debug: Verifica si el submit funciona
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      error("Las contraseñas no coinciden");
+      toast.error("Las contraseñas no coinciden");
       return;
     }
 
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        error("No está autorizado");
+        toast.error("No está autorizado");
         return;
       }
       if (!user || !user._id) {
-        error("No se encontró el usuario actual");
+        toast.error("No se encontró el usuario actual");
         return;
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/user/${user._id}/password`,
+      // Usando axios para la llamada a la API de cambio de contraseña
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_URL}/user/${user._id}/password`, // Asumiendo que el endpoint es PUT
         {
-          method: "PUT",
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        },
+        {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            currentPassword: passwordData.currentPassword,
-            newPassword: passwordData.newPassword,
-          }),
         }
       );
 
-      const data = await response.json();
-
-      if (data.success) {
-        success("Contraseña actualizada correctamente");
+      if (response.data.success) {
+        toast.success("Contraseña actualizada correctamente");
+        await refreshUserData(); // Llama a refreshUserData
         setPasswordData({
           currentPassword: "",
           newPassword: "",
           confirmPassword: "",
         });
       } else {
-        error(data.message || "Error al actualizar la contraseña");
+        toast.error(response.data.message || "Error al actualizar la contraseña");
       }
-    } catch (err) {
-      error("Error de red al actualizar la contraseña");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error de red al actualizar la contraseña");
     }
   }
 
   const handleLogout = () => {
     logout()
-    success("Sesión cerrada correctamente")
+    toast.success("Sesión cerrada correctamente")
   }
 
   const initials = useMemo(() => getInitials(user?.firstName ?? '', user?.lastName ?? user?.username ?? ''), [user]);
@@ -451,8 +474,7 @@ const UserProfile = () => {
           </div>
         </div>
       )}
-      {/* Toast notifications */}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      {/* ToastContainer ya no es necesario aquí, react-hot-toast usa un Toaster global */}
     </>
   )
 }

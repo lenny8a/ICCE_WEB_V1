@@ -1,27 +1,30 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, lazy, Suspense } from "react"
 import { Route, Routes, useLocation } from "react-router-dom"
 
 import Loader from "./common/Loader"
 import PageTitle from "./components/PageTitle"
-import SignIn from "./pages/Authentication/SignIn"
-import SignUp from "./pages/Authentication/SignUp"
-import VisEmbal from "./pages/consulEmbal"
-import ECommerce from "./pages/Dashboard/ECommerce"
 import DefaultLayout from "./layout/DefaultLayout"
-import Reubica from "./pages/Reubica"
-//import Picking from "./pages/Picking"
-import PickingHistory from "./pages/Picking-history"
-import MantenimientoExcepciones from "./pages/Mantennimientos/mantExcepciones"
-import Conteos from "./pages/Conteos"
-import MantenimientoExcepcionesCase from "./pages/CaseExcepciones"
-import UserManagement from "./pages/Authentication/UserManagement"
-import RoleManagement from "./pages/Authentication/RoleManagement"
 import { AuthProvider } from "./context/AuthContext"
 import ProtectedRoute from "./components/ProtectedRoute"
-import ConteoHistory from "./pages/conteo-history"
-import AccessDenied from "./pages/AccessDenied"
-import UserProfile from "./pages/UserProfile"
-import PickingRouter from "./pages/picking-router"
+import { Toaster } from "react-hot-toast"
+
+// Lazy loaded components
+const SignIn = lazy(() => import("./pages/Authentication/SignIn"))
+const SignUp = lazy(() => import("./pages/Authentication/SignUp"))
+const VisEmbal = lazy(() => import("./pages/consulEmbal"))
+const ECommerce = lazy(() => import("./pages/Dashboard/ECommerce"))
+const Reubica = lazy(() => import("./pages/Reubica"))
+const PickingHistory = lazy(() => import("./pages/Picking-history"))
+const MantenimientoExcepciones = lazy(() => import("./pages/Mantennimientos/mantExcepciones"))
+const Conteos = lazy(() => import("./pages/Conteos"))
+const MantenimientoExcepcionesCase = lazy(() => import("./pages/CaseExcepciones"))
+const UserManagement = lazy(() => import("./pages/Authentication/UserManagement"))
+const RoleManagement = lazy(() => import("./pages/Authentication/RoleManagement"))
+const ConteoHistory = lazy(() => import("./pages/conteo-history"))
+const AccessDenied = lazy(() => import("./pages/AccessDenied"))
+const UserProfile = lazy(() => import("./pages/UserProfile"))
+const PickingRouter = lazy(() => import("./pages/picking-router"))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true)
@@ -41,9 +44,12 @@ function App() {
       {loading ? (
         <Loader />
       ) : (
-        <Routes>
-          <Route
-            index
+        <>
+          <Toaster position="top-right" />
+          <Suspense fallback={<Loader />}>
+            <Routes>
+              <Route
+                index
             element={
               <ProtectedRoute>
                 <DefaultLayout>
@@ -182,7 +188,7 @@ function App() {
                   <PageTitle title="ICCE" />
                   <SignUp />
                 </DefaultLayout>
-              // </ProtectedRoute>
+              </ProtectedRoute>
             }
           />
 
@@ -217,7 +223,20 @@ function App() {
               </>
             }
           />
-        </Routes>
+
+            {/* Ruta para 404 Not Found */}
+            <Route
+              path="*"
+              element={
+                <>
+                  <PageTitle title="404 - Página No Encontrada" />
+                  <NotFoundPage />
+                </>
+              }
+            />
+            </Routes>
+          </Suspense>
+        </>
       )}
     </AuthProvider>
   )

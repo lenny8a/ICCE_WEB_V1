@@ -1,13 +1,10 @@
-"use client"
-
 import axios from "axios"
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import Breadcrumb from "../components/Breadcrumbs/Breadcrumb"
 import ErrorMessage from "../components/ErrorMessage"
 import type { viewEmbalForm } from "../types"
-import { useToast } from "../hooks/useToast"
-import ToastContainer from "../components/ToastContainer"
+import toast from 'react-hot-toast'; // Importar react-hot-toast
 import { useMobile } from "../hooks/use-mobile"
 import { useAuth } from "../context/AuthContext"
 
@@ -159,7 +156,7 @@ const Reubica = () => {
 
   const form1 = useForm({ defaultValues: initialState })
   const form2 = useForm({ defaultValues: initialState })
-  const { toasts, removeToast, success, error } = useToast()
+  // const { toasts, removeToast, success, error } = useToast() // Eliminado
   const api_url = import.meta.env.VITE_API_URL
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -172,7 +169,7 @@ const Reubica = () => {
 
   const { checkPermission } = useAuth()
   const canModificar = checkPermission("/entrada/reubicar", "modificar")
-  console.log("Accion Modificar", canModificar)
+  // console.log("Accion Modificar", canModificar) // Eliminado
 
   const {
     register: registerForm1,
@@ -251,7 +248,7 @@ const Reubica = () => {
       setCount({ ...data1 })
       const Response = await axios.post(`${api_url}/entr/view`, formData)
 
-      console.log(Response.data)
+      // console.log(Response.data) // Eliminado
 
       if (Response.data.CODE !== "OK") {
         let descript = ""
@@ -264,32 +261,32 @@ const Reubica = () => {
           descript = "Case en estado eliminado, no es posible reubicar"
         }
 
-        error(`${descript}`)
+        toast.error(`${descript}`)
         setIsLoading(false)
         return
       }
 
       if (!Response.data.EMBALAJE || !Response.data.EMBALAJE.EMBAL) {
-        error(`No se encontró el case ${formData.embal}`)
+        toast.error(`No se encontró el case ${formData.embal}`)
         setIsLoading(false)
         return
       }
 
       setCount(Response.data.EMBALAJE)
-      success(`Case ${formData.embal} encontrado`)
+      toast.success(`Case ${formData.embal} encontrado`)
       setIsLoading(false)
     } catch (err) {
-      console.error("Error al buscar el case:", err)
+      console.error("Error al buscar el case:", err) // Mantener para errores de API
       resetForm1()
 
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 404) {
-          error(`No se encontró el case ${formData.embal}. Verifique el número e intente nuevamente.`)
+          toast.error(`No se encontró el case ${formData.embal}. Verifique el número e intente nuevamente.`)
         } else {
-          error(`Error al buscar el case: ${err.response?.data?.message || "Error desconocido"}`)
+          toast.error(`Error al buscar el case: ${err.response?.data?.message || "Error desconocido"}`)
         }
       } else {
-        error(`Error al buscar el case ${formData.embal}. Verifique su conexión e intente nuevamente.`)
+        toast.error(`Error al buscar el case ${formData.embal}. Verifique su conexión e intente nuevamente.`)
       }
       setIsLoading(false)
     }
@@ -298,7 +295,7 @@ const Reubica = () => {
   // Función para manejar el envío del formulario
   const handleFormSubmit = (formData: viewEmbalForm) => {
     if (!canModificar) {
-      error("No tiene permisos para modificar ubicaciones")
+      toast.error("No tiene permisos para modificar ubicaciones")
       return
     }
 
@@ -315,7 +312,7 @@ const Reubica = () => {
 
   async function handleReubica(formData: viewEmbalForm) {
     if (!canModificar) {
-      error("No tiene permisos para modificar ubicaciones")
+      toast.error("No tiene permisos para modificar ubicaciones")
       return
     }
 
@@ -349,31 +346,31 @@ const Reubica = () => {
 
           // Enviar el log a la API
           await axios.post(`${api_url}/ubicacion-log`, logData)
-          console.log("Log de ubicación registrado correctamente")
+          // console.log("Log de ubicación registrado correctamente") // Eliminado
         } catch (logErr) {
-          console.error("Error al registrar log de ubicación:", logErr)
+          console.error("Error al registrar log de ubicación:", logErr) // Mantener para errores de API
           // No interrumpimos el flujo principal si falla el registro del log
         }
       }
 
-      success(`Case ${count.EMBAL} reubicado correctamente a: ${formData.zubic || "Sin ubicación"}`)
+      toast.success(`Case ${count.EMBAL} reubicado correctamente a: ${formData.zubic || "Sin ubicación"}`)
 
       count.ZUBIC = formData.zubic
       resetForm2()
       setFocus("embal")
       setIsLoading(false)
     } catch (err) {
-      console.error("Error al actualizar la ubicación:", err)
+      console.error("Error al actualizar la ubicación:", err) // Mantener para errores de API
       resetForm2()
 
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 404) {
-          error(`No se encontró el case para reubicar. Verifique el número e intente nuevamente.`)
+          toast.error(`No se encontró el case para reubicar. Verifique el número e intente nuevamente.`)
         } else {
-          error(`Error al actualizar la ubicación: ${err.response?.data?.message || "Error desconocido"}`)
+          toast.error(`Error al actualizar la ubicación: ${err.response?.data?.message || "Error desconocido"}`)
         }
       } else {
-        error("Error al actualizar la ubicación. Intente nuevamente.")
+        toast.error("Error al actualizar la ubicación. Intente nuevamente.")
       }
       setIsLoading(false)
     }
@@ -381,7 +378,7 @@ const Reubica = () => {
 
   async function handleExcepcion(excepcion: ExcepcionData) {
     if (!canModificar) {
-      error("No tiene permisos para asignar excepciones")
+      toast.error("No tiene permisos para asignar excepciones")
       return
     }
 
@@ -396,23 +393,23 @@ const Reubica = () => {
 
       const response = await axios.post(`${api_url}/entr/excepcion`, excepcionData)
       setIsModalOpen(false)
-      success(`Excepción "${excepcion.name}" registrada correctamente para el case ${count.EMBAL}`)
+      toast.success(`Excepción "${excepcion.name}" registrada correctamente para el case ${count.EMBAL}`)
 
       resetForm2()
       resetForm1()
       setCount({ ...data1 })
       setFocus("embal")
     } catch (err) {
-      console.error("Error al registrar la excepción:", err)
+      console.error("Error al registrar la excepción:", err) // Mantener para errores de API
 
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 404) {
-          error(`No se encontró el case para registrar la excepción.`)
+          toast.error(`No se encontró el case para registrar la excepción.`)
         } else {
-          error(`Error al registrar la excepción: ${err.response?.data?.message || "Error desconocido"}`)
+          toast.error(`Error al registrar la excepción: ${err.response?.data?.message || "Error desconocido"}`)
         }
       } else {
-        error("Error al registrar la excepción. Intente nuevamente.")
+        toast.error("Error al registrar la excepción. Intente nuevamente.")
       }
     } finally {
       setIsLoading(false)
@@ -423,58 +420,7 @@ const Reubica = () => {
     setIsModalOpen(false)
   }
 
-  useEffect(() => {
-    // Crear un elemento de estilo
-    const styleElement = document.createElement("style")
-    styleElement.textContent = `
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-
-      @keyframes scaleIn {
-        from { 
-          opacity: 0; 
-          transform: scale(0.95);
-        }
-        to { 
-          opacity: 1;
-          transform: scale(1);
-        }
-      }
-
-      @keyframes slideInRight {
-        from {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-
-      .animate-fadeIn {
-        animation: fadeIn 0.2s ease-out forwards;
-      }
-
-      .animate-scaleIn {
-        animation: scaleIn 0.3s ease-out forwards;
-      }
-
-      .animate-slideInRight {
-        animation: slideInRight 0.3s ease-out forwards;
-      }
-    `
-
-    // Añadir al head
-    document.head.appendChild(styleElement)
-
-    // Limpiar al desmontar
-    return () => {
-      document.head.removeChild(styleElement)
-    }
-  }, [])
+  // useEffect para estilos de animación eliminado
 
   // Renderizado para dispositivos móviles
   if (isMobile) {
@@ -482,7 +428,7 @@ const Reubica = () => {
       <>
         <Breadcrumb pageName="Ubicar Case" />
 
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        {/* ToastContainer eliminado */}
 
         {/* Diálogo de confirmación */}
         <ConfirmDialog
@@ -1074,7 +1020,7 @@ const Reubica = () => {
     <>
       <Breadcrumb pageName="Ubicar Case" />
 
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+        {/* ToastContainer eliminado */}
 
       {/* Diálogo de confirmación */}
       <ConfirmDialog
