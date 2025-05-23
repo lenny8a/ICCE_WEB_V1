@@ -55,70 +55,56 @@ const TableOne = () => {
         Top Channels
       </h4>
 
-      <div className="flex flex-col">
-        <div className="grid grid-cols-3 rounded-sm bg-gray-2 dark:bg-meta-4 sm:grid-cols-5">
-          <div className="p-2.5 xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">
-              Source
-            </h5>
-          </div>
-          <div className="p-2.5 text-center xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">
-              Visitors
-            </h5>
-          </div>
-          <div className="p-2.5 text-center xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">
-              Revenues
-            </h5>
-          </div>
-          <div className="hidden p-2.5 text-center sm:block xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">
-              Sales
-            </h5>
-          </div>
-          <div className="hidden p-2.5 text-center sm:block xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">
-              Conversion
-            </h5>
-          </div>
-        </div>
-
-        {brandData.map((brand, key) => (
-          <div
-            className={`grid grid-cols-3 sm:grid-cols-5 ${
-              key === brandData.length - 1
-                ? ''
-                : 'border-b border-stroke dark:border-strokedark'
-            }`}
-            key={key}
-          >
-            <div className="flex items-center gap-3 p-2.5 xl:p-5">
-              <div className="flex-shrink-0">
-                <img src={brand.logo} alt="Brand" />
-              </div>
-              <p className="hidden text-black dark:text-white sm:block">
-                {brand.name}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-center p-2.5 xl:p-5">
-              <p className="text-black dark:text-white">{brand.visitors}K</p>
-            </div>
-
-            <div className="flex items-center justify-center p-2.5 xl:p-5">
-              <p className="text-meta-3">${brand.revenues}</p>
-            </div>
-
-            <div className="hidden items-center justify-center p-2.5 sm:flex xl:p-5">
-              <p className="text-black dark:text-white">{brand.sales}</p>
-            </div>
-
-            <div className="hidden items-center justify-center p-2.5 sm:flex xl:p-5">
-              <p className="text-meta-5">{brand.conversion}%</p>
-            </div>
-          </div>
-        ))}
+      <div className="max-w-full overflow-x-auto"> {/* Para responsividad en tablas */}
+        <table className="w-full table-auto">
+          <thead>
+            <tr className="bg-gray-2 text-left dark:bg-meta-4">
+              <th className="min-w-[220px] py-4 px-4 font-medium text-black dark:text-white xl:pl-11">
+                Source
+              </th>
+              <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white text-center">
+                Visitors
+              </th>
+              <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white text-center">
+                Revenues
+              </th>
+              <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white text-center hidden sm:table-cell"> {/* Ocultar en sm y mostrar como table-cell */}
+                Sales
+              </th>
+              <th className="py-4 px-4 font-medium text-black dark:text-white text-center hidden sm:table-cell"> {/* Ocultar en sm y mostrar como table-cell */}
+                Conversion
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {brandData.map((brand, key) => (
+              <tr key={key} className={`${key === brandData.length -1 ? '' : 'border-b border-stroke dark:border-strokedark'}`}>
+                <td className="py-5 px-4 pl-9 xl:pl-11"> {/* Ajusta el padding si es necesario */}
+                  <div className="flex items-center gap-3"> {/* Mantén el flex para el logo y el nombre */}
+                    <div className="flex-shrink-0">
+                      <img src={brand.logo} alt="Brand" loading="lazy" />
+                    </div>
+                    <p className="hidden text-black dark:text-white sm:block">
+                      {brand.name}
+                    </p>
+                  </div>
+                </td>
+                <td className="py-5 px-4 text-center">
+                  <p className="text-black dark:text-white">{brand.visitors}K</p>
+                </td>
+                <td className="py-5 px-4 text-center">
+                  <p className="text-meta-3">${brand.revenues}</p>
+                </td>
+                <td className="py-5 px-4 text-center hidden sm:table-cell">
+                  <p className="text-black dark:text-white">{brand.sales}</p>
+                </td>
+                <td className="py-5 px-4 text-center hidden sm:table-cell">
+                  <p className="text-meta-5">{brand.conversion}%</p>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

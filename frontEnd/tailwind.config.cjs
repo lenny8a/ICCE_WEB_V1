@@ -12,6 +12,7 @@ module.exports = {
     screens: {
       '2xsm': '375px',
       xsm: '425px',
+      'xs': '480px', // Añade esta línea
       '3xl': '2000px',
       ...defaultTheme.screens,
     },

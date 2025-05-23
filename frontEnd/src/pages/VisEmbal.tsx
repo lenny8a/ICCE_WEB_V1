@@ -1,16 +1,13 @@
-"use client"
-
 import Breadcrumb from "../components/Breadcrumbs/Breadcrumb"
 import { useForm } from "react-hook-form"
 import ErrorMessage from "../components/ErrorMessage"
-import type { viewEmbalForm } from "../types"
+import type { viewEmbalForm } from "../types" // Asumiendo que este tipo es necesario
 import axios from "axios"
 import { useEffect, useState } from "react"
-import { useToast } from "../hooks/useToast"
-import ToastContainer from "../components/ToastContainer"
+import toast from 'react-hot-toast'; // Importar react-hot-toast
 import { useMobile } from "../hooks/use-mobile"
 
-const vis_embal = () => {
+const VisEmbal: React.FC = () => { // Renombrado y tipado como React.FC
   const initialState = {
     embal: "",
   }
@@ -85,7 +82,7 @@ const vis_embal = () => {
   } = useForm({ defaultValues: initialState })
   const [count, setCount] = useState(data1)
   const api_url = import.meta.env.VITE_API_URL
-  const { toasts, removeToast, success, error } = useToast()
+  // const { toasts, removeToast, success, error } = useToast() // Eliminado
   const [isLoading, setIsLoading] = useState(false)
 
   // Usar el hook useMobile para detectar si estamos en un dispositivo móvil
@@ -246,14 +243,14 @@ const vis_embal = () => {
       const Response = await axios.post(`${api_url}/entr/view`, formData)
 
       if (!Response.data.EMBALAJE || !Response.data.EMBALAJE.EMBAL) {
-        error(`No se encontró el case ${formData.embal}`)
+        toast.error(`No se encontró el case ${formData.embal}`)
         reset()
         setIsLoading(false)
         return
       }
 
       setCount(Response.data.EMBALAJE)
-      success(`Case ${formData.embal} encontrado`)
+      toast.success(`Case ${formData.embal} encontrado`)
 
       // Cargar el historial de ubicaciones
       try {
@@ -289,15 +286,15 @@ const vis_embal = () => {
       // Establecer la pestaña activa a "basic" cuando se carga un nuevo case
       setActiveTab("basic")
     } catch (err) {
-      console.error("Error al buscar el case:", err)
+      console.error("Error al buscar el case:", err) // Mantener para debugging de API
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 404) {
-          error(`No se encontró el case ${formData.embal}. Verifique el número e intente nuevamente.`)
+          toast.error(`No se encontró el case ${formData.embal}. Verifique el número e intente nuevamente.`)
         } else {
-          error(`Error al buscar el case: ${err.response?.data?.message || "Error desconocido"}`)
+          toast.error(`Error al buscar el case: ${err.response?.data?.message || "Error desconocido"}`)
         }
       } else {
-        error(`Error al buscar el case ${formData.embal}. Verifique su conexión e intente nuevamente.`)
+        toast.error(`Error al buscar el case ${formData.embal}. Verifique su conexión e intente nuevamente.`)
       }
       reset()
       setIsLoading(false)
@@ -450,7 +447,7 @@ const vis_embal = () => {
   const renderHandheldVersion = () => {
     return (
       <div className="p-2">
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        {/* ToastContainer eliminado */}
 
         <div className="grid grid-cols-1 gap-3">
           {/* Título para dispositivos handheld */}
@@ -914,7 +911,7 @@ const vis_embal = () => {
     return (
       <>
         <Breadcrumb pageName="Visualizar case" />
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        {/* ToastContainer eliminado */}
 
         <div className="grid grid-cols-1 gap-4">
           {/* Sección de búsqueda mejorada */}
@@ -1396,4 +1393,4 @@ const vis_embal = () => {
   return isHandheld ? renderHandheldVersion() : renderDesktopVersion()
 }
 
-export default vis_embal
+export default VisEmbal; // Exportar con el nuevo nombre

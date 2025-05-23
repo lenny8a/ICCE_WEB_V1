@@ -31,6 +31,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>
   logout: () => void
   checkPermission: (pagePath: string, action: string) => boolean
+  refreshUserData: () => Promise<void>; // Nueva función
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -45,6 +46,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
+  // Declarar loadUserData para que pueda ser llamada por refreshUserData
+  const loadUserData = async () => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      // Asegurar que el token esté configurado en axios
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`
+
+      // Decodificar el token para obtener el ID del usuario
+      let userId: string
+      try {
+        const decoded = jwtDecode<TokenPayload>(token)
+
+        // Verificar proactivamente la expiración del token
+        if (decoded.exp * 1000 < Date.now()) {
+          localStorage.removeItem("token");
+          setToken(null);
+          setUser(null);
+          setPermissions({});
+          delete axios.defaults.headers.common["Authorization"];
+          if (window.location.pathname !== "/auth/signin") {
+            navigate("/auth/signin");
+          }
+          setLoading(false);
+          return;
+        }
+        userId = decoded.id
+      } catch (decodeError) {
+        localStorage.removeItem("token")
+        setToken(null)
+        setUser(null)
+        delete axios.defaults.headers.common["Authorization"]
+        if (window.location.pathname !== "/auth/signin") {
+          navigate("/auth/signin")
+        }
+        setLoading(false)
+        return
+      }
+
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/${userId}`)
+
+      if (response.data.success) {
+        setUser(response.data.data)
+
+        try {
+          const permissionsResponse = await axios.get(`${import.meta.env.VITE_API_URL}/user/${userId}/permissions`)
+          if (permissionsResponse.data.success) {
+            const formattedPermissions: Record<string, string[]> = {}
+            permissionsResponse.data.data.forEach((permission: any) => {
+              formattedPermissions[permission.path] = permission.actions
+            })
+            setPermissions(formattedPermissions)
+          }
+        } catch (permError) {
+          // console.error("Error al cargar permisos:", permError)
+        }
+      } else {
+        localStorage.removeItem("token")
+        setToken(null)
+        setUser(null)
+        delete axios.defaults.headers.common["Authorization"]
+        if (window.location.pathname !== "/auth/signin") {
+          navigate("/auth/signin")
+        }
+      }
+    } catch (error) {
+      localStorage.removeItem("token")
+      setToken(null)
+      setUser(null)
+      delete axios.defaults.headers.common["Authorization"]
+      if (window.location.pathname !== "/auth/signin") {
+        navigate("/auth/signin")
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
   // Configurar el token en axios cuando cambie
   useEffect(() => {
     if (token) {
@@ -54,102 +137,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token])
 
-  // Cargar datos del usuario cuando hay un token
+  // Cargar datos del usuario cuando hay un token o cuando se llama a refreshUserData
   useEffect(() => {
-    const loadUserData = async () => {
-      if (!token) {
-        setLoading(false)
-        return
-      }
-
-      try {
-        console.log("Cargando datos del usuario con token:", token.substring(0, 15) + "...")
-
-        // Asegurar que el token esté configurado en axios
-        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`
-
-        // Decodificar el token para obtener el ID del usuario
-        let userId: string
-        try {
-          const decoded = jwtDecode<TokenPayload>(token)
-          userId = decoded.id
-          console.log("ID de usuario obtenido del token:", userId)
-        } catch (decodeError) {
-          console.error("Error al decodificar el token:", decodeError)
-          // Si no podemos decodificar el token, lo consideramos inválido
-          localStorage.removeItem("token")
-          setToken(null)
-          setUser(null)
-          delete axios.defaults.headers.common["Authorization"]
-          if (window.location.pathname !== "/auth/signin") {
-            navigate("/auth/signin")
-          }
-          setLoading(false)
-          return
-        }
-
-        // Obtener datos del usuario usando la ruta correcta
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/${userId}`)
-
-        if (response.data.success) {
-          console.log("Datos del usuario cargados correctamente:", response.data.data.username)
-          setUser(response.data.data)
-
-          // Cargar permisos del usuario
-          try {
-            const permissionsResponse = await axios.get(`${import.meta.env.VITE_API_URL}/user/${userId}/permissions`)
-
-            if (permissionsResponse.data.success) {
-              const formattedPermissions: Record<string, string[]> = {}
-
-              permissionsResponse.data.data.forEach((permission: any) => {
-                formattedPermissions[permission.path] = permission.actions
-              })
-
-              setPermissions(formattedPermissions)
-            }
-          } catch (permError) {
-            console.error("Error al cargar permisos:", permError)
-          }
-        } else {
-          console.error("Token inválido o expirado")
-          // Token inválido
-          localStorage.removeItem("token")
-          setToken(null)
-          setUser(null)
-          delete axios.defaults.headers.common["Authorization"]
-
-          // Redirigir a login si no estamos ya en la página de login
-          if (window.location.pathname !== "/auth/signin") {
-            navigate("/auth/signin")
-          }
-        }
-      } catch (error) {
-        console.error("Error al cargar datos del usuario:", error)
-        localStorage.removeItem("token")
-        setToken(null)
-        setUser(null)
-        delete axios.defaults.headers.common["Authorization"]
-
-        // Redirigir a login si no estamos ya en la página de login
-        if (window.location.pathname !== "/auth/signin") {
-          navigate("/auth/signin")
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadUserData()
-  }, [token, navigate])
+  }, [token, navigate]) // No incluir loadUserData aquí para evitar bucle infinito
+
+  const refreshUserData = async () => {
+    // console.log("AuthContext: Refreshing user data..."); // Log opcional
+    await loadUserData();
+  };
 
   // Función de login
   const login = async (username: string, password: string) => {
     try {
       setLoading(true)
       setError(null)
-
-      console.log("Intentando iniciar sesión con:", username)
 
       const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/login`, {
         username,
@@ -158,8 +160,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.data.success) {
         const { token: newToken, user: userData } = response.data.data
-
-        console.log("Login exitoso, guardando token:", newToken.substring(0, 15) + "...")
 
         // Guardar token en localStorage
         localStorage.setItem("token", newToken)
@@ -185,7 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setPermissions(formattedPermissions)
           }
         } catch (permError) {
-          console.error("Error al cargar permisos:", permError)
+          // console.error("Error al cargar permisos:", permError) // Podrías querer mantener este log o manejarlo de otra forma
         }
 
         // Redirigir al dashboard
@@ -194,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setError(response.data.message || "Credenciales inválidas")
       }
     } catch (error: any) {
-      console.error("Error de login:", error)
+      // console.error("Error de login:", error) // Podrías querer mantener este log o manejarlo de otra forma
       setError(error.response?.data?.message || "Error al iniciar sesión. Verifica tus credenciales.")
     } finally {
       setLoading(false)
@@ -203,7 +203,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Función de logout
   const logout = () => {
-    console.log("Cerrando sesión, eliminando token")
     localStorage.removeItem("token")
     setToken(null)
     setUser(null)
@@ -230,6 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         checkPermission,
+        refreshUserData, // Añade la nueva función
       }}
     >
       {children}
