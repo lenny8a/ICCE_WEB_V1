@@ -1,0 +1,298 @@
+/* Estilos para pantallas extra pequeñas */
+@media (min-width: 475px) { /* Corrected the media query syntax */
+  .xs\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Estilos para animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Additional animations */
+@keyframes slideInUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideInUp {
+  animation: slideInUp 0.3s ease-out forwards;
+}
+
+/* Improved scrollbar styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Tailwind gray-400 */
+  border-radius: 3px;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #4b5563; /* Tailwind gray-600 */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* Tailwind gray-500 */
+}
+
+/* Badge styles - Note: @apply is a Tailwind directive and won't work in plain CSS.
+   These need to be replaced with actual CSS or the classes applied directly in JSX.
+   For this step, I will translate them to plain CSS as best as possible.
+   If Tailwind is processed globally, these might be better left as classes in JSX.
+*/
+.badge-red {
+  background-color: #fee2e2; /* bg-red-100 */
+  color: #b91c1c; /* text-red-700 */
+}
+.dark .badge-red {
+  background-color: rgba(153, 27, 27, 0.3); /* dark:bg-red-900/30 */
+  color: #f87171; /* dark:text-red-400 */
+}
+
+.badge-green {
+  background-color: #d1fae5; /* bg-green-100 */
+  color: #047857; /* text-green-700 */
+}
+.dark .badge-green {
+  background-color: rgba(5, 150, 105, 0.3); /* dark:bg-green-900/30 */
+  color: #34d399; /* dark:text-green-400 */
+}
+
+.badge-blue {
+  background-color: #dbeafe; /* bg-blue-100 */
+  color: #1d4ed8; /* text-blue-700 */
+}
+.dark .badge-blue {
+  background-color: rgba(30, 64, 175, 0.3); /* dark:bg-blue-900/30 */
+  color: #60a5fa; /* dark:text-blue-400 */
+}
+
+.badge-yellow {
+  background-color: #fef3c7; /* bg-yellow-100 */
+  color: #b45309; /* text-yellow-700 */
+}
+.dark .badge-yellow {
+  background-color: rgba(180, 83, 9, 0.3); /* dark:bg-yellow-900/30 */
+  color: #f59e0b; /* dark:text-yellow-400 */
+}
+
+/* Card hover effect */
+.hover-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.hover-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+/* Estilos para la barra de desplazamiento */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Tailwind gray-400 */
+  border-radius: 4px;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #4b5563; /* Tailwind gray-600 */
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* Tailwind gray-500 */
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6b7280; /* Tailwind gray-500 */
+}
+
+/* Estilos para el modal de advertencia oscuro */
+.modal-dark {
+  background-color: #1e293b;
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-dark-button-cancel {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.modal-dark-button-cancel:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.modal-dark-button-confirm {
+  background-color: #10b981; /* Tailwind green-500 */
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.modal-dark-button-confirm:hover {
+  background-color: #059669; /* Tailwind green-600 */
+}
+
+.shield-icon-container {
+  background-color: #3b82f6; /* Tailwind blue-500 */
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  margin-bottom: 1rem;
+}
+
+/* Specific styles for handheld devices (480x800) */
+@media (max-width: 480px) {
+  .handheld-container {
+    padding: 0.5rem !important;
+    margin: 0.25rem !important;
+  }
+  
+  .handheld-text-sm {
+    font-size: 0.75rem !important; /* 12px */
+    line-height: 1rem !important; /* 16px */
+  }
+  
+  .handheld-text-base {
+    font-size: 0.875rem !important; /* 14px */
+    line-height: 1.25rem !important; /* 20px */
+  }
+  
+  .handheld-p-2 {
+    padding: 0.5rem !important;
+  }
+  
+  .handheld-my-1 {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+  
+  .handheld-compact-form input,
+  .handheld-compact-form button {
+    height: 2.5rem; /* 40px */
+  }
+  
+  .handheld-compact-table th,
+  .handheld-compact-table td {
+    padding: 0.5rem 0.25rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  .handheld-grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  
+  .handheld-w-full {
+    width: 100% !important;
+  }
+  
+  .handheld-flex-col {
+    flex-direction: column !important;
+  }
+  
+  .handheld-gap-1 {
+    gap: 0.25rem !important;
+  }
+  
+  .handheld-text-xs {
+    font-size: 0.7rem !important; /* ~11px */
+    line-height: 0.9rem !important; /* ~14.5px */
+  }
+  
+  .handheld-py-1 {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+  
+  .handheld-px-2 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  
+  .handheld-modal {
+    width: 95% !important;
+    max-height: 85vh !important;
+    margin: 0 auto !important;
+  }
+  
+  .handheld-modal-content {
+    padding: 0.5rem !important;
+  }
+  
+  .handheld-modal-header {
+    padding: 0.5rem !important;
+  }
+  
+  .handheld-modal-footer {
+    padding: 0.5rem !important;
+  }
+  
+  .handheld-max-h-60vh {
+    max-height: 60vh !important;
+  }
+}
