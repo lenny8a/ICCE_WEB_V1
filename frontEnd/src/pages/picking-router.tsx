@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import PickingComplete from "./Picking"
+import PickingPage from "./PickingPage" // Changed import
 import PickingMobile from "./picking-complete-mobile"
 import useDeviceDetect from "../hooks/use-device-detect"
 
@@ -23,7 +23,7 @@ const PickingRouter = () => {
   }
 
   // Después de montar, renderizar el componente apropiado según el tamaño de la pantalla
-  return isSmallMobile ? <PickingMobile /> : <PickingComplete />
+  return isSmallMobile ? <PickingMobile /> : <PickingPage /> // Changed component
 }
 
 export default PickingRouter
